@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Money Money Money</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            font-family: 'Impact', 'Arial Black', sans-serif;
+        }
+
+        body {
+            background-color: #111118;
+            color: #fff;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ORTAK BUTON STİLLERİ */
+        .btn {
+            background: linear-gradient(180deg, #ffd700 0%, #b8860b 100%);
+            color: #000;
+            border: 2px solid #fff;
+            padding: 12px 24px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            transition: all 0.1s ease;
+        }
+        .btn:hover {
+            transform: scale(1.05);
+            filter: brightness(1.1);
+        }
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        /* 1. ANA MENÜ EKRANI */
+        #main-menu {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: radial-gradient(circle, #1a2a3a 0%, #050508 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            z-index: 100;
+        }
+
+        #main-menu h1 {
+            font-size: 4rem;
+            color: #ffd700;
+            text-shadow: 4px 4px #000, 0 0 20px rgba(255, 215, 0, 0.4);
+            letter-spacing: 3px;
+            text-align: center;
+        }
+
+        .menu-box {
+            background: rgba(25, 25, 35, 0.9);
+            padding: 30px;
+            border-radius: 12px;
+            border: 2px solid #ffd700;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            width: 320px;
+        }
+
+        .lang-selector {
+            display: flex;
+            gap: 10px;
+        }
+
+        .lang-btn {
+            padding: 8px 16px;
+            background: #2a2a3a;
+            color: #aaa;
+            border: 2px solid #444;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .lang-btn.active {
+            background: #ffd700;
+            color: #000;
+            border-color: #fff;
+            font-weight: bold;
+        }
+
+        /* 2. AYARLAR MODALI */
+        #settings-modal {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+
+        .modal-content {
+            background: #1e1e2a;
+            border: 2px solid #ffd700;
+            padding: 25px;
+            border-radius: 12px;
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1rem;
+        }
+
+        .setting-row input[type=range] {
+            width: 120px;
+            accent-color: #ffd700;
+        }
+
+        /* 3. OYUN EKRANI */
+        header {
+            background: linear-gradient(180deg, #2d5a27 0%, #1e3c1a 100%);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 4px solid #ffd700;
+        }
+
+        h2 {
+            color: #ffd700;
+            font-size: 1.8rem;
+            text-shadow: 2px 2px #000;
+        }
+
+        .stats-container {
+            display: flex;
+            gap: 20px;
+            font-size: 1.2rem;
+            color: #85bb65;
+            text-shadow: 1px 1px #000;
+        }
+
+        .main-game {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - 75px);
+        }
+
+        .panel {
+            width: 30%;
+            background-color: #1e1e2a;
+            border: 2px solid #2e2e40;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .panel-title {
+            background-color: #12121c;
+            padding: 12px;
+            text-align: center;
+            font-size: 1.2rem;
+            color: #ffd700;
+            border-bottom: 2px solid #2e2e40;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .click-area {
+            width: 40%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle, #253342 0%, #050508 100%);
+            position: relative;
+        }
+
+        .capitalist-avatar {
+            width: 250px;
+            height: 250px;
+            cursor: pointer;
+            transition: transform 0.05s ease;
+            filter: drop-shadow(0 10px 15px rgba(0,0,0,0.6));
+        }
+
+        .capitalist-avatar:active {
+            transform: scale(0.92);
+        }
+
+        .click-hint {
+            margin-top: 20px;
+            font-size: 1rem;
+            color: #888;
+            letter-spacing: 1px;
+        }
+
+        /* KARTLAR */
+        .item-card {
+            background: #282838;
+            margin: 8px;
+            padding: 10px;
+            border-radius: 8px;
+            border: 2px solid #3d3d52;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        .item-card:hover {
+            background: #333348;
+            border-color: #ffd700;
+        }
+
+        .item-card.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            border-color: #2a2a38;
+        }
+
+        .item-info { display: flex; flex-direction: column; gap: 3px; }
+        .item-name { font-size: 1rem; color: #fff; }
+        .item-effect { font-size: 0.8rem; color: #85bb65; font-family: sans-serif; }
+        .item-cost { font-size: 0.9rem; color: #ffd700; font-family: sans-serif; }
+        .item-count {
+            background-color: #12121c;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 1rem;
+            color: #fff;
+            border: 1px solid #3d3d52;
+        }
+
+        .floating-text {
+            position: absolute;
+            color: #85bb65;
+            font-size: 1.8rem;
+            font-weight: bold;
+            pointer-events: none;
+            animation: floatUp 0.8s ease-out forwards;
+            text-shadow: 2px 2px #000;
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-70px) scale(1.2); }
+        }
+
+        .panel::-webkit-scrollbar { width: 6px; }
+        .panel::-webkit-scrollbar-track { background: #12121c; }
+        .panel::-webkit-scrollbar-thumb { background: #3d3d52; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+    <!-- 1. ANA MENÜ -->
+    <div id="main-menu">
+        <h1>Money Money Money</h1>
+        <div class="menu-box">
+            <div class="lang-selector">
+                <button class="lang-btn active" id="lang-eng-btn" onclick="setLanguage('ENG')">ENG</button>
+                <button class="lang-btn" id="lang-tr-btn" onclick="setLanguage('TR')">TR</button>
+            </div>
+            <button class="btn" id="start-btn" onclick="startGame()">START GAME</button>
+            <button class="btn" style="background: #444; color: #fff;" id="menu-settings-btn" onclick="openSettings()">SETTINGS</button>
+        </div>
+    </div>
+
+    <!-- 2. AYARLAR MODALI -->
+    <div id="settings-modal">
+        <div class="modal-content">
+            <h2 id="settings-title" style="text-align: center;">SETTINGS</h2>
+            
+            <div class="setting-row">
+                <span id="lbl-master">Master Volume:</span>
+                <input type="range" id="vol-master" min="0" max="1" step="0.05" value="0.8" oninput="updateVolumes()">
+            </div>
+            <div class="setting-row">
+                <span id="lbl-music">Music Volume:</span>
+                <input type="range" id="vol-music" min="0" max="1" step="0.05" value="0.5" oninput="updateVolumes()">
+            </div>
+            <div class="setting-row">
+                <span id="lbl-sfx">Click Volume:</span>
+                <input type="range" id="vol-sfx" min="0" max="1" step="0.05" value="0.7" oninput="updateVolumes()">
+            </div>
+            <div class="setting-row">
+                <span id="lbl-lang">Language:</span>
+                <div>
+                    <button class="lang-btn" id="set-eng" onclick="setLanguage('ENG')">ENG</button>
+                    <button class="lang-btn" id="set-tr" onclick="setLanguage('TR')">TR</button>
+                </div>
+            </div>
+
+            <button class="btn" style="margin-top: 10px;" onclick="closeSettings()" id="btn-close-settings">CLOSE</button>
+        </div>
+    </div>
+
+    <!-- 3. OYUN ANA EKRANI -->
+    <header>
+        <h2>Money Money Money</h2>
+        <div class="stats-container">
+            <div><span id="lbl-money">Money:</span> $<span id="money-display">0</span></div>
+            <div><span id="lbl-cpc">Per Click:</span> $<span id="cpc-display">1</span></div>
+            <div><span id="lbl-cps">Per Sec:</span> $<span id="cps-display">0</span></div>
+        </div>
+        <button class="btn" style="padding: 6px 12px; font-size: 0.9rem;" onclick="openSettings()" id="btn-in-settings">SETTINGS</button>
+    </header>
+
+    <div class="main-game">
+        <!-- SOL PANEL: BİNALAR -->
+        <div class="panel">
+            <div class="panel-title" id="title-buildings">🏢 BUILDINGS</div>
+            <div id="buildings-list"></div>
+        </div>
+
+        <!-- ORTA PANEL: TIKLAMA -->
+        <div class="click-area" id="click-area">
+            <svg class="capitalist-avatar" id="click-btn" viewBox="0 0 200 200">
+                <circle cx="100" cy="100" r="90" fill="#222" stroke="#ffd700" stroke-width="4"/>
+                <rect x="65" y="15" width="70" height="50" fill="#111" rx="3"/>
+                <rect x="50" y="60" width="100" height="10" fill="#111" rx="2"/>
+                <rect x="65" y="52" width="70" height="8" fill="#d4af37"/>
+                <circle cx="100" cy="105" r="45" fill="#ffdbac"/>
+                <circle cx="80" cy="95" r="8" fill="#fff" stroke="#000" stroke-width="2"/>
+                <circle cx="80" cy="95" r="3" fill="#000"/>
+                <circle cx="120" cy="95" r="12" fill="#e6f2ff" stroke="#ffd700" stroke-width="3"/>
+                <circle cx="120" cy="95" r="3" fill="#000"/>
+                <line x1="132" y1="95" x2="145" y2="125" stroke="#ffd700" stroke-width="2"/>
+                <path d="M 75 118 Q 100 125 100 115 Q 100 125 125 118 Q 135 130 120 130 Q 100 122 80 130 Z" fill="#333"/>
+                <path d="M 85 135 Q 100 150 115 135" fill="none" stroke="#000" stroke-width="3"/>
+                <path d="M 55 150 L 145 150 L 160 200 L 40 200 Z" fill="#1a1a2a"/>
+                <polygon points="100,150 90,160 95,195 105,195 110,160" fill="#990000"/>
+                <polygon points="75,150 100,175 90,150" fill="#fff"/>
+                <polygon points="125,150 100,175 110,150" fill="#fff"/>
+            </svg>
+            <div class="click-hint" id="click-hint">CLICK TO MAKE MONEY!</div>
+        </div>
+
+        <!-- SAĞ PANEL: RÜŞVET VE YASADIŞI İŞLER -->
+        <div class="panel">
+            <div class="panel-title" id="title-bribes">💼 BRIBES & ILLEGAL</div>
+            <div id="bribes-list"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- DİL VE METİN SÖZLÜĞÜ ---
+        let currentLang = 'ENG';
+
+        const i18n = {
+            ENG: {
+                start: "START GAME",
+                settings: "SETTINGS",
+                close: "CLOSE",
+                masterVol: "Master Volume:",
+                musicVol: "Music Volume:",
+                sfxVol: "Click Volume:",
+                language: "Language:",
+                money: "Money:",
+                perClick: "Per Click:",
+                perSec: "Per Sec:",
+                clickHint: "CLICK TO MAKE MONEY!",
+                buildingsTitle: "🏢 BUILDINGS",
+                bribesTitle: "💼 BRIBES & ILLEGAL",
+                thousand: "K", million: "M", billion: "B", trillion: "T",
+                buildings: [
+                    "Cafe", "Restaurant", "Farm", "Ammunition Factory", "Laundromat", 
+                    "Nightclub", "Crypto Mining Farm", "Private Bank", "Offshore Company", "Space Mining Corp"
+                ],
+                bribes: [
+                    "Police Officer Bribe", "Chief Inspector Bribe", "Customs Officer Bribe", 
+                    "Tax Auditor Bribe", "MP Bribe", "Minister Bribe", 
+                    "President Bribe", "Stock Market Rigging", "Global Syndicate Deal"
+                ]
+            },
+            TR: {
+                start: "OYUNA BAŞLA",
+                settings: "AYARLAR",
+                close: "KAPAT",
+                masterVol: "Genel Ses:",
+                musicVol: "Müzik Sesi:",
+                sfxVol: "Tıklama Sesi:",
+                language: "Dil Seçimi:",
+                money: "Para:",
+                perClick: "Tık Başı:",
+                perSec: "Sn Başı:",
+                clickHint: "PARA KAZANMAK İÇİN TIKLA!",
+                buildingsTitle: "🏢 BİNALAR",
+                bribesTitle: "💼 RÜŞVET VE YASADIŞI İŞLER",
+                thousand: " Bin", million: " Milyon", billion: " Milyar", trillion: " Trilyon",
+                buildings: [
+                    "Kafe", "Restorant", "Çiftlik", "Mühimmat Fabrikası", "Çamaşırhane", 
+                    "Gece Kulübü", "Kripto Madenci Çiftliği", "Özel Banka", "Offshore Şirket", "Uzay Madenciliği Şirketi"
+                ],
+                bribes: [
+                    "Zabıta Rüşveti", "Polis Amiri Rüşveti", "Gümrük Müdürü Rüşveti", 
+                    "Vergi Müfettişi Rüşveti", "Milletvekili Rüşveti", "Bakan Rüşveti", 
+                    "Cumhurbaşkanı Rüşveti", "Borsa Manipülasyonu", "Küresel Kartel Anlaşması"
+                ]
+            }
+        };
+
+        // --- OYUN VERİLERİ ---
+        let gameState = { money: 0, cpc: 1, cps: 0 };
+
+        const buildingsData = [
+            { id: 'b1', baseCost: 15, cost: 15, cps: 1, count: 0 },
+            { id: 'b2', baseCost: 100, cost: 100, cps: 5, count: 0 },
+            { id: 'b3', baseCost: 1100, cost: 1100, cps: 32, count: 0 },
+            { id: 'b4', baseCost: 12000, cost: 12000, cps: 260, count: 0 },
+            { id: 'b5', baseCost: 130000, cost: 130000, cps: 1400, count: 0 },
+            { id: 'b6', baseCost: 1400000, cost: 1400000, cps: 7800, count: 0 },
+            { id: 'b7', baseCost: 20000000, cost: 20000000, cps: 44000, count: 0 },
+            { id: 'b8', baseCost: 330000000, cost: 330000000, cps: 260000, count: 0 },
+            { id: 'b9', baseCost: 5100000000, cost: 5100000000, cps: 1600000, count: 0 },
+            { id: 'b10', baseCost: 75000000000, cost: 75000000000, cps: 10000000, count: 0 }
+        ];
+
+        const bribesData = [
+            { id: 'r1', baseCost: 50, cost: 50, cpc: 2, count: 0 },
+            { id: 'r2', baseCost: 500, cost: 500, cpc: 12, count: 0 },
+            { id: 'r3', baseCost: 5000, cost: 5000, cpc: 70, count: 0 },
+            { id: 'r4', baseCost: 50000, cost: 50000, cpc: 450, count: 0 },
+            { id: 'r5', baseCost: 500000, cost: 500000, cpc: 3000, count: 0 },
+            { id: 'r6', baseCost: 5000000, cost: 5000000, cpc: 20000, count: 0 },
+            { id: 'r7', baseCost: 100000000, cost: 100000000, cpc: 150000, count: 0 },
+            { id: 'r8', baseCost: 2500000000, cost: 2500000000, cpc: 1200000, count: 0 },
+            { id: 'r9', baseCost: 50000000000, cost: 50000000000, cpc: 10000000, count: 0 }
+        ];
+
+        // --- WEB AUDIO API (MÜZİK VE SES EFEKTLERİ) ---
+        let audioCtx = null;
+        let masterGain = null;
+        let musicGain = null;
+        let sfxGain = null;
+        let isMusicPlaying = false;
+
+        function initAudio() {
+            if (audioCtx) return;
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+
+            masterGain = audioCtx.createGain();
+            musicGain = audioCtx.createGain();
+            sfxGain = audioCtx.createGain();
+
+            musicGain.connect(masterGain);
+            sfxGain.connect(masterGain);
+            masterGain.connect(audioCtx.destination);
+
+            updateVolumes();
+        }
+
+        function updateVolumes() {
+            if (!audioCtx) return;
+            const masterVal = parseFloat(document.getElementById('vol-master').value);
+            const musicVal = parseFloat(document.getElementById('vol-music').value);
+            const sfxVal = parseFloat(document.getElementById('vol-sfx').value);
+
+            masterGain.gain.value = masterVal;
+            musicGain.gain.value = musicVal;
+            sfxGain.gain.value = sfxVal;
+        }
+
+        // Tıklama Sesi Sentezleyici
+        function playClickSound() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.05);
+
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+
+            osc.connect(gain);
+            gain.connect(sfxGain);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.05);
+        }
+
+        // Sweden (C418) Tarzı Dinamik Chill Synth Müzik Sentezleyici
+        function startSwedenStyleMusic() {
+            if (isMusicPlaying || !audioCtx) return;
+            isMusicPlaying = true;
+
+            // Sakin, duygusal piyano/synth frekans dizilimi
+            const notes = [220, 247.5, 264, 297, 330, 396, 440, 495, 528, 594]; // A, B, C, D, E, G...
+            let step = 0;
+
+            function playNote() {
+                if (!isMusicPlaying) return;
+
+                // Sweden tarzı: Aralıklı, yumuşak, gecikmeli nota vuruşları
+                if (Math.random() > 0.25) {
+                    const osc = audioCtx.createOscillator();
+                    const noteGain = audioCtx.createGain();
+
+                    // Yumuşak üçgen dalga (Piyano/Ambient tınısı)
+                    osc.type = 'triangle';
+                    
+                    const freq = notes[Math.floor(Math.random() * notes.length)];
+                    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+                    // Yavaşça yükselen ve sönümlenen reverblü vuruşlar
+                    noteGain.gain.setValueAtTime(0.001, audioCtx.currentTime);
+                    noteGain.gain.linearRampToValueAtTime(0.12, audioCtx.currentTime + 0.4);
+                    noteGain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 2.8);
+
+                    osc.connect(noteGain);
+                    noteGain.connect(musicGain);
+
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 3.0);
+                }
+
+                // Rastgele aralıklarla dingin ritim
+                const delays = [800, 1200, 1600, 2400];
+                const nextDelay = delays[Math.floor(Math.random() * delays.length)];
+                setTimeout(playNote, nextDelay);
+            }
+
+            playNote();
+        }
+
+        // --- DİL VE ARAYÜZ GÜNCELLEME ---
+        function setLanguage(lang) {
+            currentLang = lang;
+            
+            document.getElementById('lang-eng-btn').classList.toggle('active', lang === 'ENG');
+            document.getElementById('lang-tr-btn').classList.toggle('active', lang === 'TR');
+            document.getElementById('set-eng').classList.toggle('active', lang === 'ENG');
+            document.getElementById('set-tr').classList.toggle('active', lang === 'TR');
+
+            const t = i18n[lang];
+            document.getElementById('start-btn').textContent = t.start;
+            document.getElementById('menu-settings-btn').textContent = t.settings;
+            document.getElementById('btn-in-settings').textContent = t.settings;
+            document.getElementById('settings-title').textContent = t.settings;
+            document.getElementById('btn-close-settings').textContent = t.close;
+
+            document.getElementById('lbl-master').textContent = t.masterVol;
+            document.getElementById('lbl-music').textContent = t.musicVol;
+            document.getElementById('lbl-sfx').textContent = t.sfxVol;
+            document.getElementById('lbl-lang').textContent = t.language;
+
+            document.getElementById('lbl-money').textContent = t.money;
+            document.getElementById('lbl-cpc').textContent = t.perClick;
+            document.getElementById('lbl-cps').textContent = t.perSec;
+            document.getElementById('click-hint').textContent = t.clickHint;
+
+            document.getElementById('title-buildings').textContent = t.buildingsTitle;
+            document.getElementById('title-bribes').textContent = t.bribesTitle;
+
+            renderLists();
+            updateUI();
+        }
+
+        function formatMoney(amount) {
+            const t = i18n[currentLang];
+            if (amount >= 1e12) return (amount / 1e12).toFixed(2) + t.trillion;
+            if (amount >= 1e9) return (amount / 1e9).toFixed(2) + t.billion;
+            if (amount >= 1e6) return (amount / 1e6).toFixed(2) + t.million;
+            if (amount >= 1e3) return (amount / 1e3).toFixed(1) + t.thousand;
+            return Math.floor(amount).toLocaleString();
+        }
+
+        // --- MENÜ VE MODAL KONTROLLERİ ---
+        function startGame() {
+            initAudio();
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            startSwedenStyleMusic();
+            document.getElementById('main-menu').style.display = 'none';
+        }
+
+        function openSettings() {
+            initAudio();
+            document.getElementById('settings-modal').style.display = 'flex';
+        }
+
+        function closeSettings() {
+            document.getElementById('settings-modal').style.display = 'none';
+        }
+
+        // --- OYUN MEKANİKLERİ ---
+        function updateUI() {
+            document.getElementById('money-display').textContent = formatMoney(gameState.money);
+            document.getElementById('cpc-display').textContent = formatMoney(gameState.cpc);
+            document.getElementById('cps-display').textContent = formatMoney(gameState.cps);
+
+            buildingsData.forEach(b => {
+                const card = document.getElementById(`card-${b.id}`);
+                const costText = document.getElementById(`cost-${b.id}`);
+                if (card && costText) {
+                    costText.textContent = '$' + formatMoney(b.cost);
+                    card.classList.toggle('disabled', gameState.money < b.cost);
+                }
+            });
+
+            bribesData.forEach(r => {
+                const card = document.getElementById(`card-${r.id}`);
+                const costText = document.getElementById(`cost-${r.id}`);
+                if (card && costText) {
+                    costText.textContent = '$' + formatMoney(r.cost);
+                    card.classList.toggle('disabled', gameState.money < r.cost);
+                }
+            });
+        }
+
+        document.getElementById('click-btn').addEventListener('click', (e) => {
+            playClickSound();
+            gameState.money += gameState.cpc;
+
+            const clickArea = document.getElementById('click-area');
+            const rect = clickArea.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            const floatingText = document.createElement('div');
+            floatingText.className = 'floating-text';
+            floatingText.textContent = `+$${formatMoney(gameState.cpc)}`;
+            floatingText.style.left = `${x - 20}px`;
+            floatingText.style.top = `${y - 30}px`;
+
+            clickArea.appendChild(floatingText);
+            setTimeout(() => floatingText.remove(), 800);
+
+            updateUI();
+        });
+
+        function buyBuilding(index) {
+            const b = buildingsData[index];
+            if (gameState.money >= b.cost) {
+                playClickSound();
+                gameState.money -= b.cost;
+                b.count++;
+                gameState.cps += b.cps;
+                b.cost = Math.floor(b.cost * 1.15);
+                document.getElementById(`count-${b.id}`).textContent = b.count;
+                updateUI();
+            }
+        }
+
+        function buyBribe(index) {
+            const r = bribesData[index];
+            if (gameState.money >= r.cost) {
+                playClickSound();
+                gameState.money -= r.cost;
+                r.count++;
+                gameState.cpc += r.cpc;
+                r.cost = Math.floor(r.cost * 1.25);
+                document.getElementById(`count-${r.id}`).textContent = r.count;
+                updateUI();
+            }
+        }
+
+        function renderLists() {
+            const bContainer = document.getElementById('buildings-list');
+            const rContainer = document.getElementById('bribes-list');
+            bContainer.innerHTML = '';
+            rContainer.innerHTML = '';
+
+            const t = i18n[currentLang];
+
+            buildingsData.forEach((b, index) => {
+                const card = document.createElement('div');
+                card.className = 'item-card disabled';
+                card.id = `card-${b.id}`;
+                card.onclick = () => buyBuilding(index);
+                card.innerHTML = `
+                    <div class="item-info">
+                        <div class="item-name">${t.buildings[index]}</div>
+                        <div class="item-effect">+ $${formatMoney(b.cps)} /sec</div>
+                        <div class="item-cost" id="cost-${b.id}">$${formatMoney(b.cost)}</div>
+                    </div>
+                    <div class="item-count" id="count-${b.id}">${b.count}</div>
+                `;
+                bContainer.appendChild(card);
+            });
+
+            bribesData.forEach((r, index) => {
+                const card = document.createElement('div');
+                card.className = 'item-card disabled';
+                card.id = `card-${r.id}`;
+                card.onclick = () => buyBribe(index);
+                card.innerHTML = `
+                    <div class="item-info">
+                        <div class="item-name">${t.bribes[index]}</div>
+                        <div class="item-effect">+ $${formatMoney(r.cpc)} /click</div>
+                        <div class="item-cost" id="cost-${r.id}">$${formatMoney(r.cost)}</div>
+                    </div>
+                    <div class="item-count" id="count-${r.id}">${r.count}</div>
+                `;
+                rContainer.appendChild(card);
+            });
+        }
+
+        // Pasif Gelir Döngüsü
+        setInterval(() => {
+            if (gameState.cps > 0) {
+                gameState.money += gameState.cps / 10;
+                updateUI();
+            }
+        }, 100);
+
+        // Başlangıç Kurulumu
+        setLanguage('ENG');
+    </script>
+</body>
+</html>
