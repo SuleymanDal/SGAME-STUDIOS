@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Coin Toss</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --container-bg: rgba(30, 41, 59, 0.9);
+            --text-color: #f8fafc;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        body {
+            background: radial-gradient(circle at center, #311042 0%, #0f172a 100%);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            padding: 10px;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 440px;
+            background: var(--container-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 2px solid rgba(244, 114, 182, 0.3);
+            border-radius: 28px;
+            padding: 20px;
+            box-shadow: 0 25px 50px -12px rgba(244, 114, 182, 0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        /* Gizli Yönetici Butonu (Sağ üstte küçük kırmızı daire) */
+        .secret-dot {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 8px;
+            height: 8px;
+            background-color: #ef4444;
+            border-radius: 50%;
+            cursor: pointer;
+            opacity: 0.2;
+            transition: opacity 0.2s;
+            z-index: 10;
+        }
+        .secret-dot:hover {
+            opacity: 1;
+        }
+
+        /* Şifre Modal Ekranı */
+        .modal {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(8px);
+            border-radius: 28px;
+            z-index: 20;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal input {
+            background: #1e293b;
+            border: 1px solid #475569;
+            color: #fff;
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            width: 80%;
+            margin-bottom: 12px;
+            text-align: center;
+            outline: none;
+        }
+
+        .modal-btns {
+            display: flex;
+            gap: 8px;
+        }
+
+        .modal-btn {
+            background: #f472b6;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .modal-btn.cancel {
+            background: #475569;
+        }
+
+        .header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .title h1 {
+            font-size: 1.8rem;
+            font-weight: 900;
+            background: linear-gradient(45deg, #f472b6, #fbbf24, #38bdf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 0.5px;
+            line-height: 1.1;
+        }
+
+        .title p {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            margin-top: 2px;
+        }
+
+        /* Bakiye ve Skor Paneli */
+        .stats-panel {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .stat-box {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            padding: 8px 12px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            color: #94a3b8;
+            font-weight: 700;
+        }
+
+        .stat-value {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #fbbf24;
+            margin-top: 2px;
+        }
+
+        /* Yazı Tura Ekranı */
+        .coin-screen {
+            width: 100%;
+            background: linear-gradient(135deg, #1e1b4b, #0f172a);
+            border: 4px solid #f472b6;
+            border-radius: 20px;
+            height: 220px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0 6px 15px rgba(0,0,0,0.8), 0 0 20px rgba(244, 114, 182, 0.4);
+            margin-bottom: 15px;
+            position: relative;
+            perspective: 1000px;
+        }
+
+        .coin {
+            width: 110px;
+            height: 110px;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 1.5s cubic-bezier(0.15, 0.85, 0.35, 1);
+        }
+
+        .coin-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: 900;
+            backface-visibility: hidden;
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.6);
+            border: 4px solid #fbbf24;
+        }
+
+        .coin-head {
+            background: linear-gradient(135deg, #fbbf24, #d97706);
+            color: #1e1b4b;
+        }
+
+        .coin-tail {
+            background: linear-gradient(135deg, #94a3b8, #475569);
+            color: #fff;
+            transform: rotateY(180deg);
+        }
+
+        /* Seçim Butonları (Head / Tail Seçimi) */
+        .choice-container {
+            width: 100%;
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .choice-btn {
+            background: rgba(51, 65, 85, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            padding: 10px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            flex: 1;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .choice-btn.active {
+            background: #38bdf8;
+            border-color: #fff;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+            color: #0f172a;
+        }
+
+        /* Bahis Kontrolleri */
+        .bet-controls {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            gap: 8px;
+        }
+
+        .bet-btn-group {
+            display: flex;
+            gap: 5px;
+            flex: 1;
+        }
+
+        .bet-chip {
+            background: rgba(51, 65, 85, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            padding: 8px 0;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            flex: 1;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .bet-chip.active {
+            background: #f472b6;
+            border-color: #fff;
+            box-shadow: 0 0 10px rgba(244, 114, 182, 0.6);
+        }
+
+        .spin-btn {
+            background: linear-gradient(135deg, #f472b6, #db2777);
+            color: white;
+            border: none;
+            padding: 14px;
+            font-weight: 800;
+            font-size: 1.1rem;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 6px 20px rgba(219, 39, 119, 0.5);
+            width: 100%;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .spin-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(219, 39, 119, 0.8);
+        }
+
+        .spin-btn:disabled {
+            background: #475569;
+            cursor: not-allowed;
+            box-shadow: none;
+            opacity: 0.7;
+        }
+
+        .message {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #34d399;
+            min-height: 24px;
+            text-align: center;
+            margin-bottom: 5px;
+        }
+
+        .footer-credit {
+            margin-top: 5px;
+            font-size: 0.7rem;
+            color: #64748b;
+            letter-spacing: 0.5px;
+            text-align: center;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <!-- Sağ üst gizli kırmızı daire -->
+        <div class="secret-dot" onclick="openSecretModal()" title="Secret"></div>
+
+        <!-- Şifre Giriş Modalı -->
+        <div class="modal" id="secret-modal">
+            <h3 style="font-size: 1rem; margin-bottom: 10px; color: #f472b6;">Secret Code</h3>
+            <input type="password" id="secret-input" placeholder="Enter code...">
+            <div class="modal-btns">
+                <button class="modal-btn" onclick="checkSecretPassword()">Submit</button>
+                <button class="modal-btn cancel" onclick="closeSecretModal()">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="header">
+            <div class="title">
+                <h1>Coin Toss</h1>
+                <p>Classic Casino Edition</p>
+            </div>
+            <button class="bet-chip" onclick="resetBalance()" style="flex: unset; padding: 6px 12px; font-size: 0.75rem;">Reset Cash</button>
+        </div>
+
+        <!-- Stats Panel -->
+        <div class="stats-panel">
+            <div class="stat-box">
+                <div class="stat-label">Balance</div>
+                <div id="balance" class="stat-value">$1000</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Last Win</div>
+                <div id="last-win" class="stat-value">$0</div>
+            </div>
+        </div>
+
+        <!-- Coin Screen -->
+        <div class="coin-screen">
+            <div class="coin" id="coin">
+                <div class="coin-face coin-head">HEAD</div>
+                <div class="coin-face coin-tail">TAIL</div>
+            </div>
+        </div>
+
+        <!-- Choice Selection (Head or Tail) -->
+        <div class="choice-container">
+            <button class="choice-btn active" id="btn-head" onclick="setChoice('head')">HEAD</button>
+            <button class="choice-btn" id="btn-tail" onclick="setChoice('tail')">TAIL</button>
+        </div>
+
+        <!-- Bet Selection -->
+        <div class="bet-controls">
+            <div class="stat-label" style="align-self: center;">BET:</div>
+            <div class="bet-btn-group">
+                <button class="bet-chip active" onclick="setBet(10)">10</button>
+                <button class="bet-chip" onclick="setBet(25)">25</button>
+                <button class="bet-chip" onclick="setBet(50)">50</button>
+                <button class="bet-chip" onclick="setBet(100)">100</button>
+            </div>
+        </div>
+
+        <!-- Toss Button -->
+        <button id="spin-btn" class="spin-btn" onclick="tossCoin()">TOSS COIN</button>
+
+        <!-- Message Box -->
+        <div class="message" id="message">Choose Head or Tail and toss!</div>
+
+        <!-- SGame Copyright -->
+        <div class="footer-credit">
+            © 2026 SGame. All rights reserved.
+        </div>
+    </div>
+
+    <script>
+        let balance = 1000;
+        let currentBet = 10;
+        let playerChoice = 'head'; // 'head' veya 'tail'
+        let isTossing = false;
+        let currentRotationY = 0;
+
+        const balanceEl = document.getElementById('balance');
+        const lastWinEl = document.getElementById('last-win');
+        const messageEl = document.getElementById('message');
+        const spinBtn = document.getElementById('spin-btn');
+        const coinEl = document.getElementById('coin');
+        const secretModal = document.getElementById('secret-modal');
+        const secretInput = document.getElementById('secret-input');
+
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(type) {
+            try {
+                initAudio();
+                if (!audioCtx) return;
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                let now = audioCtx.currentTime;
+
+                if (type === 'spin') {
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(150, now + 0.05);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.05);
+                    osc.start(now);
+                    osc.stop(now + 0.05);
+                } else if (type === 'win') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.setValueAtTime(600, now + 0.15);
+                    osc.frequency.setValueAtTime(800, now + 0.3);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.5);
+                    osc.start(now);
+                    osc.stop(now + 0.5);
+                } else if (type === 'lose') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.linearRampToValueAtTime(80, now + 0.2);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                }
+            } catch(e) {}
+        }
+
+        function openSecretModal() {
+            secretModal.style.display = 'flex';
+            secretInput.value = '';
+            secretInput.focus();
+        }
+
+        function closeSecretModal() {
+            secretModal.style.display = 'none';
+        }
+
+        function checkSecretPassword() {
+            let val = secretInput.value.trim().toLowerCase();
+            if (val === "3131" || val === "hamid") {
+                // Hile aktif: Para kesinlikle HEAD (Yazı) gelsin
+                playerChoice = 'head';
+                document.getElementById('btn-head').classList.add('active');
+                document.getElementById('btn-tail').classList.remove('active');
+
+                currentRotationY = Math.round(currentRotationY / 360) * 360; // Head açısına getir (0 derece)
+                coinEl.style.transform = `rotateY(${currentRotationY}deg)`;
+
+                let winAmount = currentBet * 2;
+                balance += winAmount;
+                balanceEl.textContent = `$${balance}`;
+                lastWinEl.textContent = `$${winAmount}`;
+                messageEl.textContent = `🎉 ADMIN JACKPOT! Head came up! +$${winAmount}`;
+                playSound('win');
+                closeSecretModal();
+            } else {
+                messageEl.textContent = "❌ Incorrect Code!";
+                closeSecretModal();
+            }
+        }
+
+        function setChoice(choice) {
+            if (isTossing) return;
+            playerChoice = choice;
+            document.getElementById('btn-head').classList.toggle('active', choice === 'head');
+            document.getElementById('btn-tail').classList.toggle('active', choice === 'tail');
+        }
+
+        function setBet(amount) {
+            if (isTossing) return;
+            currentBet = amount;
+            document.querySelectorAll('.bet-chip').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent == amount) btn.classList.add('active');
+            });
+        }
+
+        function resetBalance() {
+            if (isTossing) return;
+            balance = 1000;
+            balanceEl.textContent = `$${balance}`;
+            messageEl.textContent = "Balance reset to $1000!";
+            lastWinEl.textContent = "$0";
+        }
+
+        function tossCoin() {
+            if (isTossing) return;
+
+            if (balance < currentBet) {
+                messageEl.textContent = "⚠️ Not enough balance!";
+                return;
+            }
+
+            balance -= currentBet;
+            balanceEl.textContent = `$${balance}`;
+            lastWinEl.textContent = "$0";
+            isTossing = true;
+            spinBtn.disabled = true;
+            messageEl.textContent = "Tossing the coin...";
+
+            // Ses efektleri
+            let count = 0;
+            let soundInterval = setInterval(() => {
+                playSound('spin');
+                count++;
+                if (count > 15) clearInterval(soundInterval);
+            }, 80);
+
+            // Rastgele sonuç belirle (Head = 0 derece katları, Tail = 180 derece katları)
+            let result = Math.random() < 0.5 ? 'head' : 'tail';
+            let extraTurns = (Math.floor(Math.random() * 4) + 4) * 360; // 4 ila 7 tam tur
+            
+            if (result === 'tail') {
+                currentRotationY += extraTurns + 180;
+            } else {
+                currentRotationY += extraTurns;
+            }
+
+            coinEl.style.transform = `rotateY(${currentRotationY}deg)`;
+
+            setTimeout(() => {
+                finalizeToss(result);
+            }, 1500);
+        }
+
+        function finalizeToss(result) {
+            let winAmount = 0;
+
+            if (result === playerChoice) {
+                winAmount = currentBet * 2;
+                balance += winAmount;
+                balanceEl.textContent = `$${balance}`;
+                lastWinEl.textContent = `$${winAmount}`;
+                messageEl.textContent = `🎉 YOU WON! Result was ${result.toUpperCase()}! +$${winAmount}`;
+                playSound('win');
+            } else {
+                messageEl.textContent = `😢 YOU LOST! Result was ${result.toUpperCase()}.`;
+                playSound('lose');
+            }
+
+            isTossing = false;
+            spinBtn.disabled = false;
+        }
+    </script>
+</body>
+</html>
