@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Flappy Bird</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --container-bg: rgba(30, 41, 59, 0.85);
+            --text-color: #f8fafc;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        body {
+            background: radial-gradient(circle at center, #1e1b4b 0%, #0f172a 100%);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 400px;
+            background: var(--container-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .title h1 {
+            font-size: 2.2rem;
+            font-weight: 900;
+            background: linear-gradient(45deg, #facc15, #f97316);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 1px;
+            line-height: 1;
+        }
+
+        .title p {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            margin-top: 4px;
+        }
+
+        .stats-container {
+            display: flex;
+            gap: 8px;
+        }
+
+        .stat-box {
+            background: rgba(15, 23, 42, 0.7);
+            padding: 6px 12px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            min-width: 70px;
+        }
+
+        .stat-title {
+            font-size: 0.55rem;
+            text-transform: uppercase;
+            color: #94a3b8;
+            font-weight: 700;
+        }
+
+        .stat-value {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #facc15;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 3 / 4;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: inset 0 4px 12px rgba(0,0,0,0.6);
+            border: 2px solid #334155;
+            margin-bottom: 15px;
+            background: #4facfe;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            width: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(59, 130, 246, 0.6);
+        }
+
+        .footer-credit {
+            margin-top: 10px;
+            font-size: 0.7rem;
+            color: #64748b;
+            letter-spacing: 0.5px;
+            text-align: center;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <!-- Header & Stats -->
+        <div class="header">
+            <div class="title">
+                <h1>Flappy Bird</h1>
+                <p>SGame Arcade Edition</p>
+            </div>
+            <div class="stats-container">
+                <div class="stat-box">
+                    <div class="stat-title">Score</div>
+                    <div id="score" class="stat-value">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-title">Best</div>
+                    <div id="best-score" class="stat-value">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Canvas Area -->
+        <div class="canvas-wrapper" id="canvas-wrapper">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+
+        <!-- Button -->
+        <button class="btn" id="action-btn" onclick="handleButtonAction()">Start Game</button>
+
+        <!-- SGame Copyright -->
+        <div class="footer-credit">
+            © 2026 SGame. All rights reserved.
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score');
+        const bestScoreDisplay = document.getElementById('best-score');
+        const actionBtn = document.getElementById('action-btn');
+
+        const width = 320;
+        const height = 420;
+        canvas.width = width;
+        canvas.height = height;
+
+        let bestScore = localStorage.getItem('sgame_flappy_best_fast') || 0;
+        bestScoreDisplay.textContent = bestScore;
+
+        let gameStatus = 'START'; // START, PLAYING, GAMEOVER
+        let score = 0;
+
+        let bird = {
+            x: 60,
+            y: 180,
+            radius: 13,
+            gravity: 0.42,   // Daha hızlı düşüş için artırıldı
+            lift: -7.2,      // Daha keskin zıplama
+            velocity: 0,
+            rotation: 0
+        };
+
+        let pipes = [];
+        let pipeWidth = 52;
+        let pipeGap = 115;
+        let frameCount = 0;
+        let pipeSpeed = 3.8; // Hız artırıldı
+
+        // Arka plan efektleri için bulutlar
+        let clouds = [
+            { x: 50, y: 80, speed: 0.6, size: 30 },
+            { x: 200, y: 140, speed: 0.4, size: 22 },
+            { x: 310, y: 60, speed: 0.5, size: 25 }
+        ];
+
+        function resetGame() {
+            bird.y = 180;
+            bird.velocity = 0;
+            pipes = [];
+            score = 0;
+            frameCount = 0;
+            scoreDisplay.textContent = score;
+            gameStatus = 'PLAYING';
+            actionBtn.textContent = 'Jump / Flap';
+        }
+
+        function handleButtonAction() {
+            if (gameStatus === 'START' || gameStatus === 'GAMEOVER') {
+                resetGame();
+            } else if (gameStatus === 'PLAYING') {
+                bird.velocity = bird.lift;
+            }
+        }
+
+        window.addEventListener('keydown', e => {
+            if (e.code === 'Space' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (gameStatus === 'PLAYING') {
+                    bird.velocity = bird.lift;
+                } else if (gameStatus === 'START' || gameStatus === 'GAMEOVER') {
+                    resetGame();
+                }
+            }
+        });
+
+        canvas.addEventListener('click', () => {
+            if (gameStatus === 'PLAYING') {
+                bird.velocity = bird.lift;
+            } else if (gameStatus === 'START' || gameStatus === 'GAMEOVER') {
+                resetGame();
+            }
+        });
+
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameStatus === 'PLAYING') {
+                bird.velocity = bird.lift;
+            } else if (gameStatus === 'START' || gameStatus === 'GAMEOVER') {
+                resetGame();
+            }
+        }, {passive: false});
+
+        function update() {
+            // Bulutlar her durumda hareket eder
+            for (let cloud of clouds) {
+                cloud.x -= cloud.speed;
+                if (cloud.x < -40) {
+                    cloud.x = width + 40;
+                    cloud.y = Math.random() * 150 + 30;
+                }
+            }
+
+            if (gameStatus !== 'PLAYING') return;
+
+            bird.velocity += bird.gravity;
+            bird.y += bird.velocity;
+            bird.rotation = Math.min(Math.PI / 4, Math.max(-Math.PI / 4, bird.velocity * 0.08));
+
+            if (bird.y + bird.radius >= height - 20) {
+                bird.y = height - 20 - bird.radius;
+                gameOver();
+            }
+            if (bird.y - bird.radius <= 0) {
+                bird.y = bird.radius;
+                bird.velocity = 0;
+            }
+
+            // Hızlı boru üretim aralığı
+            if (frameCount % 70 === 0) {
+                let minHeight = 50;
+                let maxHeight = height - pipeGap - 90;
+                let topHeight = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+                
+                pipes.push({
+                    x: width,
+                    top: topHeight,
+                    bottom: height - topHeight - pipeGap,
+                    passed: false
+                });
+            }
+
+            for (let i = pipes.length - 1; i >= 0; i--) {
+                pipes[i].x -= pipeSpeed;
+
+                if (!pipes[i].passed && pipes[i].x + pipeWidth < bird.x) {
+                    score++;
+                    scoreDisplay.textContent = score;
+                    pipes[i].passed = true;
+                    if (score > bestScore) {
+                        bestScore = score;
+                        localStorage.setItem('sgame_flappy_best_fast', bestScore);
+                        bestScoreDisplay.textContent = bestScore;
+                    }
+                }
+
+                if (
+                    bird.x + bird.radius - 3 > pipes[i].x &&
+                    bird.x - bird.radius + 3 < pipes[i].x + pipeWidth &&
+                    (bird.y - bird.radius + 3 < pipes[i].top || bird.y + bird.radius - 3 > height - pipes[i].bottom - 20)
+                ) {
+                    gameOver();
+                }
+
+                if (pipes[i].x + pipeWidth < 0) {
+                    pipes.splice(i, 1);
+                }
+            }
+
+            frameCount++;
+        }
+
+        function gameOver() {
+            gameStatus = 'GAMEOVER';
+            actionBtn.textContent = 'Play Again';
+        }
+
+        function draw() {
+            // Şık gradyan gökyüzü arka planı
+            let grad = ctx.createLinearGradient(0, 0, 0, height);
+            grad.addColorStop(0, '#38bdf8');
+            grad.addColorStop(1, '#bae6fd');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, width, height);
+
+            // Bulutları Çiz
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            for (let cloud of clouds) {
+                ctx.beginPath();
+                ctx.arc(cloud.x, cloud.y, cloud.size, 0, Math.PI * 2);
+                ctx.arc(cloud.x + cloud.size * 0.6, cloud.y - cloud.size * 0.2, cloud.size * 0.7, 0, Math.PI * 2);
+                ctx.arc(cloud.x + cloud.size * 1.2, cloud.y, cloud.size * 0.8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Gelişmiş Borular (Degrade ve detay çizgili)
+            for (let pipe of pipes) {
+                let pipeGradTop = ctx.createLinearGradient(pipe.x, 0, pipe.x + pipeWidth, 0);
+                pipeGradTop.addColorStop(0, '#16a34a');
+                pipeGradTop.addColorStop(0.5, '#22c55e');
+                pipeGradTop.addColorStop(1, '#15803d');
+
+                // Üst Boru
+                ctx.fillStyle = pipeGradTop;
+                ctx.fillRect(pipe.x, 0, pipeWidth, pipe.top);
+                ctx.strokeStyle = '#14532d';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(pipe.x, 0, pipeWidth, pipe.top);
+
+                // Boru Başlığı (Üst)
+                ctx.fillRect(pipe.x - 3, pipe.top - 18, pipeWidth + 6, 18);
+                ctx.strokeRect(pipe.x - 3, pipe.top - 18, pipeWidth + 6, 18);
+
+                // Alt Boru
+                let pipeGradBottom = ctx.createLinearGradient(pipe.x, height - pipe.bottom, pipe.x + pipeWidth, height);
+                pipeGradBottom.addColorStop(0, '#16a34a');
+                pipeGradBottom.addColorStop(0.5, '#22c55e');
+                pipeGradBottom.addColorStop(1, '#15803d');
+
+                ctx.fillStyle = pipeGradBottom;
+                ctx.fillRect(pipe.x, height - pipe.bottom - 20, pipeWidth, pipe.bottom);
+                ctx.strokeRect(pipe.x, height - pipe.bottom - 20, pipeWidth, pipe.bottom);
+
+                // Boru Başlığı (Alt)
+                ctx.fillRect(pipe.x - 3, height - pipe.bottom - 20, pipeWidth + 6, 18);
+                ctx.strokeRect(pipe.x - 3, height - pipe.bottom - 20, pipeWidth + 6, 18);
+            }
+
+            // Çimenli Zemin
+            ctx.fillStyle = '#15803d';
+            ctx.fillRect(0, height - 20, width, 20);
+            ctx.fillStyle = '#4ade80';
+            ctx.fillRect(0, height - 20, width, 5);
+
+            // Detaylı Kuş Çizimi ve Rotasyonu
+            ctx.save();
+            ctx.translate(bird.x, bird.y);
+            ctx.rotate(bird.rotation);
+
+            // Kuş Gövdesi
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.arc(0, 0, bird.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#ca8a04';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Kanat
+            ctx.fillStyle = '#fde047';
+            ctx.beginPath();
+            ctx.ellipse(-3, 3, 6, 4, Math.PI / 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Göz
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(4, -4, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(5, -4, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Gaga
+            ctx.fillStyle = '#f97316';
+            ctx.beginPath();
+            ctx.moveTo(bird.radius - 2, -2);
+            ctx.lineTo(bird.radius + 8, 1);
+            ctx.lineTo(bird.radius - 2, 5);
+            ctx.fill();
+
+            ctx.restore();
+
+            // Menü ve Bitiş Ekranı Yazıları
+            if (gameStatus === 'START') {
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.5)';
+                ctx.fillRect(0, 0, width, height);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 20px Segoe UI';
+                ctx.textAlign = 'center';
+                ctx.fillText('Tap or Press to Start', width / 2, height / 2 - 10);
+            } else if (gameStatus === 'GAMEOVER') {
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.65)';
+                ctx.fillRect(0, 0, width, height);
+                ctx.fillStyle = '#ef4444';
+                ctx.font = 'bold 26px Segoe UI';
+                ctx.textAlign = 'center';
+                ctx.fillText('Game Over', width / 2, height / 2 - 20);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '15px Segoe UI';
+                ctx.fillText(`Score: ${score}`, width / 2, height / 2 + 10);
+            }
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        loop();
+    </script>
+</body>
+</html>
