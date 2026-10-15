@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Number Place (Sudoku)</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --container-bg: rgba(30, 41, 59, 0.85);
+            --grid-bg: #1e293b;
+            --cell-bg: #334155;
+            --text-color: #f8fafc;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        body {
+            background: radial-gradient(circle at center, #1e1b4b 0%, #0f172a 100%);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            padding: 10px;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 420px;
+            background: var(--container-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 18px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .title h1 {
+            font-size: 1.5rem;
+            font-weight: 900;
+            background: linear-gradient(45deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 0.5px;
+            line-height: 1.1;
+        }
+
+        .title p {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            margin-top: 2px;
+        }
+
+        .controls-top {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            gap: 8px;
+        }
+
+        .select-diff {
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #f8fafc;
+            padding: 6px 10px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(59, 130, 246, 0.6);
+        }
+
+        /* Gizli Input (Mobil Cihazlarda klavyeyi tetiklemek için) */
+        #hidden-input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+            height: 0;
+            width: 0;
+        }
+
+        /* Sudoku Tablosu (Grid) */
+        .sudoku-grid {
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            grid-template-rows: repeat(9, 1fr);
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background: #0f172a;
+            border: 3px solid #475569;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .cell {
+            background: var(--cell-bg);
+            border: 1px solid #475569;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #38bdf8;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .cell.selected {
+            background: #1d4ed8 !important;
+            color: #fff;
+        }
+
+        .cell.initial {
+            color: #f8fafc;
+            font-weight: 800;
+        }
+
+        .cell.error {
+            color: #ef4444 !important;
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        /* 3x3 Kalın Çizgi Sınırları */
+        .cell:nth-child(3n) { border-right: 2px solid #94a3b8; }
+        .cell:nth-child(9n) { border-right: 1px solid #475569; }
+        .sudoku-grid > div:nth-child(n+19):nth-child(-n+27),
+        .sudoku-grid > div:nth-child(n+46):nth-child(-n+54) {
+            border-bottom: 2px solid #94a3b8;
+        }
+
+        .message {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #34d399;
+            min-height: 22px;
+            text-align: center;
+            margin-bottom: 5px;
+        }
+
+        .footer-credit {
+            margin-top: 5px;
+            font-size: 0.7rem;
+            color: #64748b;
+            letter-spacing: 0.5px;
+            text-align: center;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <!-- Header -->
+        <div class="header">
+            <div class="title">
+                <h1>Number Place (Sudoku)</h1>
+                <p>Use keyboard / device keypad</p>
+            </div>
+            <button class="btn" onclick="newGame()">New Game</button>
+        </div>
+
+        <!-- Controls / Difficulty -->
+        <div class="controls-top">
+            <select id="difficulty" class="select-diff" onchange="newGame()">
+                <option value="easy">Easy</option>
+                <option value="medium" selected>Medium</option>
+                <option value="hard">Hard</option>
+            </select>
+            <div id="timer" style="font-size: 0.85rem; font-weight: 700; color: #cbd5e1;">Time: 00:00</div>
+        </div>
+
+        <!-- Cihazın kendi klavyesini tetikleyen görünmez input -->
+        <input type="number" id="hidden-input" pattern="[1-9]" max="9" min="1">
+
+        <!-- Sudoku Grid -->
+        <div class="sudoku-grid" id="sudoku-grid"></div>
+
+        <!-- Message Box -->
+        <div class="message" id="message">Tap a cell and type a number</div>
+
+        <!-- SGame Copyright -->
+        <div class="footer-credit">
+            © 2026 SGame. All rights reserved.
+        </div>
+    </div>
+
+    <script>
+        const gridEl = document.getElementById('sudoku-grid');
+        const messageEl = document.getElementById('message');
+        const diffSelect = document.getElementById('difficulty');
+        const timerEl = document.getElementById('timer');
+        const hiddenInput = document.getElementById('hidden-input');
+
+        let solution = [];
+        let puzzle = [];
+        let userGrid = [];
+        let selectedCell = null;
+        let timerInterval = null;
+        let secondsElapsed = 0;
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            secondsElapsed = 0;
+            timerInterval = setInterval(() => {
+                secondsElapsed++;
+                let mins = Math.floor(secondsElapsed / 60).toString().padStart(2, '0');
+                let secs = (secondsElapsed % 60).toString().padStart(2, '0');
+                timerEl.textContent = `Time: ${mins}:${secs}`;
+            }, 1000);
+        }
+
+        function generateSudoku() {
+            solution = Array(9).fill(0).map(() => Array(9).fill(0));
+            fillBoard(solution);
+
+            puzzle = solution.map(row => [...row]);
+            let diff = diffSelect.value;
+            let removeCount = diff === 'easy' ? 35 : diff === 'medium' ? 45 : 55;
+
+            let removed = 0;
+            while (removed < removeCount) {
+                let r = Math.floor(Math.random() * 9);
+                let c = Math.floor(Math.random() * 9);
+                if (puzzle[r][c] !== 0) {
+                    puzzle[r][c] = 0;
+                    removed++;
+                }
+            }
+            userGrid = puzzle.map(row => [...row]);
+        }
+
+        function fillBoard(board) {
+            let empty = findEmpty(board);
+            if (!empty) return true;
+            let [r, c] = empty;
+            let nums = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+
+            for (let num of nums) {
+                if (isValid(board, r, c, num)) {
+                    board[r][c] = num;
+                    if (fillBoard(board)) return true;
+                    board[r][c] = 0;
+                }
+            }
+            return false;
+        }
+
+        function findEmpty(board) {
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (board[r][c] === 0) return [r, c];
+                }
+            }
+            return null;
+        }
+
+        function isValid(board, r, c, num) {
+            for (let i = 0; i < 9; i++) {
+                if (board[r][i] === num && i !== c) return false;
+                if (board[i][c] === num && i !== r) return false;
+            }
+            let startRow = Math.floor(r / 3) * 3;
+            let startCol = Math.floor(c / 3) * 3;
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    let currR = startRow + i;
+                    let currC = startCol + j;
+                    if (board[currR][currC] === num && (currR !== r || currC !== c)) return false;
+                }
+            }
+            return true;
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                let j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function newGame() {
+            generateSudoku();
+            renderGrid();
+            startTimer();
+            messageEl.textContent = "New game started. Good luck!";
+            selectedCell = null;
+        }
+
+        function renderGrid() {
+            gridEl.innerHTML = '';
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    let cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+
+                    let val = userGrid[r][c];
+                    if (val !== 0) {
+                        cell.textContent = val;
+                        if (puzzle[r][c] !== 0) {
+                            cell.classList.add('initial');
+                        }
+                    }
+
+                    cell.addEventListener('click', () => selectCell(r, c, cell));
+                    gridEl.appendChild(cell);
+                }
+            }
+        }
+
+        function selectCell(r, c, cellEl) {
+            document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected'));
+            if (puzzle[r][c] === 0) {
+                selectedCell = { r, c, el: cellEl };
+                cellEl.classList.add('selected');
+                
+                // Mobil cihazlarda dijital klavyeyi tetikle
+                hiddenInput.value = '';
+                hiddenInput.focus();
+            } else {
+                selectedCell = null;
+                hiddenInput.blur();
+            }
+        }
+
+        function processInput(num) {
+            if (!selectedCell) return;
+            let { r, c, el } = selectedCell;
+            
+            userGrid[r][c] = num;
+            el.textContent = num === 0 ? '' : num;
+            el.classList.remove('error');
+
+            if (num !== 0 && num !== solution[r][c]) {
+                el.classList.add('error');
+                messageEl.textContent = "Incorrect placement!";
+            } else if (num !== 0) {
+                messageEl.textContent = "Great choice!";
+            } else {
+                messageEl.textContent = "Cell cleared.";
+            }
+
+            checkWinCondition();
+        }
+
+        // Cihazın kendi klavye girdilerini yakalama (Mobil & PC)
+        hiddenInput.addEventListener('input', (e) => {
+            let val = hiddenInput.value;
+            if (val.length > 0) {
+                let lastChar = val.slice(-1);
+                if (lastChar >= '1' && lastChar <= '9') {
+                    processInput(parseInt(lastChar));
+                }
+                hiddenInput.value = ''; // Inputu temizle ki tekrar yazılabilsin
+            }
+        });
+
+        // Bilgisayar (PC) Fiziksel Klavye Desteği
+        window.addEventListener('keydown', e => {
+            if (!selectedCell) return;
+            if (e.key >= '1' && e.key <= '9') {
+                processInput(parseInt(e.key));
+            } else if (e.key === 'Backspace' || e.key === 'Delete') {
+                processInput(0);
+            }
+        });
+
+        function checkWinCondition() {
+            let isComplete = true;
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (userGrid[r][c] !== solution[r][c]) {
+                        isComplete = false;
+                        break;
+                    }
+                }
+            }
+            if (isComplete) {
+                clearInterval(timerInterval);
+                messageEl.textContent = `🎉 Congratulations! Completed in ${timerEl.textContent.replace('Time: ', '')}`;
+            }
+        }
+
+        // Oyunu Başlat
+        newGame();
+    </script>
+</body>
+</html>
