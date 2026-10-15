@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Spin The Bottle</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --container-bg: rgba(30, 41, 59, 0.9);
+            --text-color: #f8fafc;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        body {
+            background: radial-gradient(circle at center, #311042 0%, #0f172a 100%);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            padding: 10px;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 440px;
+            background: var(--container-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 2px solid rgba(244, 114, 182, 0.3);
+            border-radius: 28px;
+            padding: 20px;
+            box-shadow: 0 25px 50px -12px rgba(244, 114, 182, 0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        /* Gizli Yönetici Butonu (Sağ üstte küçük kırmızı daire) */
+        .secret-dot {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 8px;
+            height: 8px;
+            background-color: #ef4444;
+            border-radius: 50%;
+            cursor: pointer;
+            opacity: 0.2;
+            transition: opacity 0.2s;
+            z-index: 10;
+        }
+        .secret-dot:hover {
+            opacity: 1;
+        }
+
+        /* Şifre Modal Ekranı */
+        .modal {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(8px);
+            border-radius: 28px;
+            z-index: 20;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal input {
+            background: #1e293b;
+            border: 1px solid #475569;
+            color: #fff;
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            width: 80%;
+            margin-bottom: 12px;
+            text-align: center;
+            outline: none;
+        }
+
+        .modal-btns {
+            display: flex;
+            gap: 8px;
+        }
+
+        .modal-btn {
+            background: #f472b6;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .modal-btn.cancel {
+            background: #475569;
+        }
+
+        .header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .title h1 {
+            font-size: 1.8rem;
+            font-weight: 900;
+            background: linear-gradient(45deg, #f472b6, #fbbf24, #38bdf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 0.5px;
+            line-height: 1.1;
+        }
+
+        .title p {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            margin-top: 2px;
+        }
+
+        /* Bakiye ve Skor Paneli */
+        .stats-panel {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .stat-box {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            padding: 8px 12px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            color: #94a3b8;
+            font-weight: 700;
+        }
+
+        .stat-value {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #fbbf24;
+            margin-top: 2px;
+        }
+
+        /* Şişe Çevirmece Ekranı */
+        .bottle-screen {
+            width: 100%;
+            background: linear-gradient(135deg, #1e1b4b, #0f172a);
+            border: 4px solid #f472b6;
+            border-radius: 20px;
+            height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0 6px 15px rgba(0,0,0,0.8), 0 0 20px rgba(244, 114, 182, 0.4);
+            margin-bottom: 15px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .bottle {
+            width: 40px;
+            height: 120px;
+            background: linear-gradient(90deg, #38bdf8, #818cf8);
+            border-radius: 20px 20px 10px 10px;
+            position: absolute;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.6);
+            transition: transform 3s cubic-bezier(0.15, 0.85, 0.35, 1);
+            transform-origin: center center;
+        }
+
+        /* Şişenin ağız kısmı */
+        .bottle::before {
+            content: '';
+            position: absolute;
+            top: -15px;
+            width: 16px;
+            height: 15px;
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        /* Bahis Kontrolleri */
+        .bet-controls {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            gap: 8px;
+        }
+
+        .bet-btn-group {
+            display: flex;
+            gap: 5px;
+            flex: 1;
+        }
+
+        .bet-chip {
+            background: rgba(51, 65, 85, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            padding: 8px 0;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            flex: 1;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .bet-chip.active {
+            background: #f472b6;
+            border-color: #fff;
+            box-shadow: 0 0 10px rgba(244, 114, 182, 0.6);
+        }
+
+        .spin-btn {
+            background: linear-gradient(135deg, #f472b6, #db2777);
+            color: white;
+            border: none;
+            padding: 14px;
+            font-weight: 800;
+            font-size: 1.1rem;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 6px 20px rgba(219, 39, 119, 0.5);
+            width: 100%;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .spin-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(219, 39, 119, 0.8);
+        }
+
+        .spin-btn:disabled {
+            background: #475569;
+            cursor: not-allowed;
+            box-shadow: none;
+            opacity: 0.7;
+        }
+
+        .message {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #34d399;
+            min-height: 24px;
+            text-align: center;
+            margin-bottom: 5px;
+        }
+
+        .footer-credit {
+            margin-top: 5px;
+            font-size: 0.7rem;
+            color: #64748b;
+            letter-spacing: 0.5px;
+            text-align: center;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <!-- Sağ üst gizli kırmızı daire -->
+        <div class="secret-dot" onclick="openSecretModal()" title="Secret"></div>
+
+        <!-- Şifre Giriş Modalı -->
+        <div class="modal" id="secret-modal">
+            <h3 style="font-size: 1rem; margin-bottom: 10px; color: #f472b6;">Secret Code</h3>
+            <input type="password" id="secret-input" placeholder="Enter code...">
+            <div class="modal-btns">
+                <button class="modal-btn" onclick="checkSecretPassword()">Submit</button>
+                <button class="modal-btn cancel" onclick="closeSecretModal()">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="header">
+            <div class="title">
+                <h1>Spin The Bottle</h1>
+                <p>Party Casino Edition</p>
+            </div>
+            <button class="bet-chip" onclick="resetBalance()" style="flex: unset; padding: 6px 12px; font-size: 0.75rem;">Reset Cash</button>
+        </div>
+
+        <!-- Stats Panel -->
+        <div class="stats-panel">
+            <div class="stat-box">
+                <div class="stat-label">Balance</div>
+                <div id="balance" class="stat-value">$1000</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Last Win</div>
+                <div id="last-win" class="stat-value">$0</div>
+            </div>
+        </div>
+
+        <!-- Bottle Screen -->
+        <div class="bottle-screen">
+            <div class="bottle" id="bottle"></div>
+        </div>
+
+        <!-- Bet Selection -->
+        <div class="bet-controls">
+            <div class="stat-label" style="align-self: center;">BET:</div>
+            <div class="bet-btn-group">
+                <button class="bet-chip active" onclick="setBet(10)">10</button>
+                <button class="bet-chip" onclick="setBet(25)">25</button>
+                <button class="bet-chip" onclick="setBet(50)">50</button>
+                <button class="bet-chip" onclick="setBet(100)">100</button>
+            </div>
+        </div>
+
+        <!-- Spin Button -->
+        <button id="spin-btn" class="spin-btn" onclick="spinBottle()">SPIN BOTTLE</button>
+
+        <!-- Message Box -->
+        <div class="message" id="message">Place your bet and spin the bottle!</div>
+
+        <!-- SGame Copyright -->
+        <div class="footer-credit">
+            © 2026 SGame. All rights reserved.
+        </div>
+    </div>
+
+    <script>
+        let balance = 1000;
+        let currentBet = 10;
+        let isSpinning = false;
+        let currentRotation = 0;
+
+        const balanceEl = document.getElementById('balance');
+        const lastWinEl = document.getElementById('last-win');
+        const messageEl = document.getElementById('message');
+        const spinBtn = document.getElementById('spin-btn');
+        const bottleEl = document.getElementById('bottle');
+        const secretModal = document.getElementById('secret-modal');
+        const secretInput = document.getElementById('secret-input');
+
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(type) {
+            try {
+                initAudio();
+                if (!audioCtx) return;
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                let now = audioCtx.currentTime;
+
+                if (type === 'spin') {
+                    osc.frequency.setValueAtTime(200, now);
+                    osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                } else if (type === 'win') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.setValueAtTime(600, now + 0.15);
+                    osc.frequency.setValueAtTime(800, now + 0.3);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.5);
+                    osc.start(now);
+                    osc.stop(now + 0.5);
+                } else if (type === 'lose') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.linearRampToValueAtTime(80, now + 0.2);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                }
+            } catch(e) {}
+        }
+
+        function openSecretModal() {
+            secretModal.style.display = 'flex';
+            secretInput.value = '';
+            secretInput.focus();
+        }
+
+        function closeSecretModal() {
+            secretModal.style.display = 'none';
+        }
+
+        function checkSecretPassword() {
+            let val = secretInput.value.trim().toLowerCase();
+            if (val === "3131" || val === "hamid") {
+                // Hile aktif: Şişe tam kazanan açıya (0 derece veya düz yukarı) dönsün
+                currentRotation += 360 * 5; // Fazla dönüş
+                bottleEl.style.transform = `rotate(${currentRotation}deg)`;
+                
+                let winAmount = currentBet * 10; // 10x kazanç
+                balance += winAmount;
+                balanceEl.textContent = `$${balance}`;
+                lastWinEl.textContent = `$${winAmount}`;
+                messageEl.textContent = `🎉 JACKPOT! Bottle pointed to target! +$${winAmount}`;
+                playSound('win');
+                closeSecretModal();
+            } else {
+                messageEl.textContent = "❌ Incorrect Code!";
+                closeSecretModal();
+            }
+        }
+
+        function setBet(amount) {
+            if (isSpinning) return;
+            currentBet = amount;
+            document.querySelectorAll('.bet-chip').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent == amount) btn.classList.add('active');
+            });
+        }
+
+        function resetBalance() {
+            if (isSpinning) return;
+            balance = 1000;
+            balanceEl.textContent = `$${balance}`;
+            messageEl.textContent = "Balance reset to $1000!";
+            lastWinEl.textContent = "$0";
+        }
+
+        function spinBottle() {
+            if (isSpinning) return;
+
+            if (balance < currentBet) {
+                messageEl.textContent = "⚠️ Not enough balance!";
+                return;
+            }
+
+            balance -= currentBet;
+            balanceEl.textContent = `$${balance}`;
+            lastWinEl.textContent = "$0";
+            isSpinning = true;
+            spinBtn.disabled = true;
+            messageEl.textContent = "Spinning the bottle...";
+
+            // Ses efekti simülasyonu
+            let count = 0;
+            let soundInterval = setInterval(() => {
+                playSound('spin');
+                count++;
+                if(count > 25) clearInterval(soundInterval);
+            }, 100);
+
+            // Rastgele ek tur (1080 ile 2880 derece arası) + rastgele açı
+            let randomAdditional = Math.floor(Math.random() * 1800) + 1080;
+            currentRotation += randomAdditional;
+            bottleEl.style.transform = `rotate(${currentRotation}deg)`;
+
+            setTimeout(() => {
+                finalizeSpin();
+            }, 3000); // 3 saniye animasyon süresi
+        }
+
+        function finalizeSpin() {
+            // Şişenin durduğu net açıya göre kazanıp kazanmadığını belirle (Mod 360)
+            let finalAngle = currentRotation % 360;
+            
+            // Örneğin 0 ile 90 derece arası gelirse kazansın
+            let isWin = finalAngle < 120; 
+            let winAmount = 0;
+
+            if (isWin) {
+                winAmount = currentBet * 5; // 5x ödül
+                balance += winAmount;
+                balanceEl.textContent = `$${balance}`;
+                lastWinEl.textContent = `$${winAmount}`;
+                messageEl.textContent = `🎉 LUCKY SPIN! +$${winAmount}`;
+                playSound('win');
+            } else {
+                messageEl.textContent = "😢 Missed! Try again.";
+                playSound('lose');
+            }
+
+            isSpinning = false;
+            spinBtn.disabled = false;
+        }
+    </script>
+</body>
+</html>
