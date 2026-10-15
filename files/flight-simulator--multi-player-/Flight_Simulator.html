@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arcade Flight Simulation Matrix - Multiplayer LAN Edition</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+        body { overflow: hidden; background-color: #87CEEB; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #game-canvas { width: 100vw; height: 100vh; display: block; }
+        
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: none; }
+        
+        #speedometer {
+            position: absolute; bottom: 30px; right: 40px;
+            background: rgba(5, 5, 5, 0.95); border-radius: 12px;
+            width: 190px; padding: 18px;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            border: 2px solid #222; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+        #speed-value { color: #fff; font-size: 46px; font-weight: 800; line-height: 1; }
+        #speed-unit { color: #666; font-size: 13px; font-weight: 600; letter-spacing: 1px; margin-bottom: 8px; }
+        
+        #rpm-container { width: 100%; background: #111; height: 6px; border-radius: 3px; overflow: hidden; margin-bottom: 6px; }
+        #rpm-bar { width: 0%; height: 100%; background: linear-gradient(to right, #00cbff, #ff2222); }
+        #rpm-text { color: #888; font-size: 11px; font-family: monospace; margin-bottom: 6px; }
+        #gear-display { color: #ff2222; font-size: 22px; font-weight: bold; }
+        
+        #controls-hint {
+            position: absolute; top: 20px; left: 20px;
+            background: rgba(0, 0, 0, 0.85); color: #ccc; padding: 15px; border-radius: 6px;
+            font-size: 12px; line-height: 1.5; border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        /* XYZ KOORDİNAT PANELİ STİLLERİ */
+        #coordinates-display {
+            position: absolute; bottom: 30px; left: 40px;
+            background: rgba(5, 5, 5, 0.95); border-radius: 12px;
+            padding: 12px 20px; border: 2px solid #222;
+            color: #00cbff; font-family: monospace; font-size: 14px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8); letter-spacing: 1px;
+            line-height: 1.4;
+        }
+        
+        #settings-btn {
+            position: absolute; top: 20px; right: 20px; pointer-events: auto;
+            background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2);
+            padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px;
+        }
+
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #0a0a0a; display: flex; justify-content: center; align-items: center;
+            flex-direction: column; z-index: 20; pointer-events: auto;
+        }
+        
+        #start-screen h1 { color: #fff; font-size: 34px; margin-bottom: 25px; font-weight: 700; text-align: center; max-width: 80%; line-height: 1.3; }
+
+        .btn {
+            background: #0088ff; color: #fff; border: none; padding: 14px 50px;
+            font-size: 16px; border-radius: 25px; cursor: pointer; font-weight: bold;
+            letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(0,136,255,0.3);
+            margin: 8px 0; transition: transform 0.2s, background 0.2s;
+        }
+        .btn:hover { background: #0077ee; transform: scale(1.02); }
+
+        #settings-menu { display: none; }
+        .settings-panel {
+            background: #111; padding: 30px; border-radius: 8px;
+            width: 360px; color: #fff; border: 1px solid #222;
+        }
+
+        /* Multiplayer Ekran Tasarımları */
+        .menu-group { display: flex; flex-direction: column; width: 280px; }
+        .input-field {
+            background: #222; border: 2px solid #444; color: #fff; padding: 12px;
+            border-radius: 25px; text-align: center; font-size: 16px; margin-bottom: 10px;
+            outline: none; font-weight: bold; letter-spacing: 2px;
+        }
+        .input-field:focus { border-color: #0088ff; }
+        #room-info-display {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85); color: #0088ff; padding: 8px 20px;
+            border-radius: 20px; font-weight: bold; font-size: 14px; border: 1px solid #0088ff;
+            letter-spacing: 1px;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <canvas id="game-canvas"></canvas>
+
+    <div id="ui-layer">
+        <div id="room-info-display">ROOM: Singleplayer</div>
+        <div id="controls-hint">
+            <strong>Onboard Flight Controls Active (400 KM/H Limit):</strong><br>
+            W — Engine Throttle (Exceed 120 km/h for Auto-Takeoff)<br>
+            S — Brake / Deceleration (Bleed Airspeed for Landing)<br>
+            A / D — Coordinated Yaw Steering & Banking Roll<br>
+            C — Toggle Camera Viewport | R — Reset Flight Vector
+        </div>
+        <button id="settings-btn">Settings</button>
+        
+        <div id="coordinates-display">
+            <div>POS X: <span id="coord-x">0.0</span></div>
+            <div>POS Y: <span id="coord-y">0.0</span></div>
+            <div>POS Z: <span id="coord-z">0.0</span></div>
+        </div>
+
+        <div id="speedometer">
+            <div id="speed-value">0</div>
+            <div id="speed-unit">km/h</div>
+            <div id="rpm-text">900 RPM</div>
+            <div id="rpm-container">
+                <div id="rpm-bar"></div>
+            </div>
+            <div id="gear-display">D1</div>
+        </div>
+    </div>
+
+    <div id="start-screen" class="overlay">
+        <h1>Arcade Flight Simulation Matrix</h1>
+        
+        <div id="main-menu-group" class="menu-group">
+            <button class="btn" id="mode-single-btn">Singleplayer</button>
+            <button class="btn" id="mode-multi-btn" style="background: #28a745; box-shadow: 0 4px 12px rgba(40,167,69,0.3);">Multiplayer LAN</button>
+        </div>
+
+        <div id="lan-menu-group" class="menu-group" style="display: none;">
+            <button class="btn" id="host-room-btn">Host Ol (Oda Kur)</button>
+            <div style="height: 15px;"></div>
+            <input type="text" id="join-code-input" class="input-field" placeholder="4 HANELİ KOD" maxlength="4">
+            <button class="btn" id="join-room-btn" style="background: #ffc107; color: #111; box-shadow: 0 4px 12px rgba(255,193,7,0.3);">Odaya Katıl</button>
+            <button class="btn" id="back-to-main-btn" style="background: #444; box-shadow: none; font-size: 13px; padding: 8px 20px; margin-top: 15px;">Geri Dön</button>
+        </div>
+    </div>
+
+    <div id="settings-menu" class="overlay">
+        <div class="settings-panel">
+            <h2 style="margin-bottom:20px;text-align:center;">System Parameters</h2>
+            <div style="margin-bottom:18px;">
+                <label style="display:block;margin-bottom:6px;font-size:13px;color:#aaa;">Acoustic Gain Level: <span id="vol-val">100</span>%</label>
+                <input type="range" id="set-volume" min="0" max="100" value="100" style="width:100%;">
+            </div>
+            <button class="btn" id="btn-close-settings" style="background:#333;box-shadow:none;width:100%;">Close Settings</button>
+        </div>
+    </div>
+
+    <script>
+        // --- GLOBAL REGISTER POOLS ---
+        const _v1 = new THREE.Vector3();
+        const _v2 = new THREE.Vector3();
+        const _euler = new THREE.Euler();
+        const dummy = new THREE.Object3D();
+        const laggedCamPos = new THREE.Vector3(0, 5, -10);
+
+        // --- SIMULATION PARAMETERS ---
+        const CONFIG = {
+            chunkSize: 500,       
+            renderRadius: 3,      
+            treesPerChunk: 180,   
+            plane: { 
+                mass: 1400, maxSpeed: 400, length: 6.8, width: 9.5, torque: 3600,
+                gears: [4.2, 3.0, 2.2, 1.6, 1.2, 0.95, 0.78, 0.62, 0.48] // 9 Forward Flight Gears
+            },
+            powertrain: { propRadius: 0.95, idleRpm: 900, redlineRpm: 6600 }
+        };
+
+        const state = {
+            isRunning: false, cameraMode: 1, volume: 1.0,
+            keys: { w: false, a: false, s: false, d: false },
+            speed: 0, rpm: 900, gear: 1,
+            airplane: { pitch: 0, roll: 0 }
+        };
+
+        // --- MULTIPLAYER NETWORK ARCHITECTURE (LAN via BroadcastChannel) ---
+        const networkState = {
+            isMultiplayer: false,
+            isHost: false,
+            roomCode: '',
+            localClientId: 'client_' + Math.random().toString(36).substr(2, 9),
+            channel: null,
+            remotePlayers: new Map(), // client_id -> { mesh, propNode, boundingBox, lastUpdate, pos, heading, pitch, roll }
+            lastBroadcastTime: 0,
+            broadcastInterval: 0.03 // ~30Hz network sync rates
+        };
+
+        // --- WEBGL CONTEXT SETUP ---
+        const canvas = document.getElementById('game-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+        renderer.shadowMap.enabled = false;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x7ec0ee);
+        scene.fog = new THREE.FogExp2(0x7ec0ee, 0.0008);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.3, 2500);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+
+        const dirLight = new THREE.DirectionalLight(0xfffbe6, 0.55);
+        scene.add(dirLight);
+
+        // --- PROCEDURAL VEGETATION GENERATOR ---
+        const stemGeo = new THREE.CylinderGeometry(0.18, 0.35, 4.0, 4);
+        const crownGeo = new THREE.ConeGeometry(2.2, 7.5, 4);
+        const stemMat = new THREE.MeshLambertMaterial({ color: 0x47362b });
+        const crownMat = new THREE.MeshLambertMaterial({ color: 0x133013 });
+
+        let terrainMesh, groundTex;
+        const activeChunks = new Map();
+        let lastChunkX = NaN, lastChunkZ = NaN;
+
+        function generatePerformanceTexture() {
+            const canvasElement = document.createElement('canvas');
+            canvasElement.width = 64; canvasElement.height = 64;
+            const ctx = canvasElement.getContext('2d');
+            ctx.fillStyle = '#275933'; ctx.fillRect(0, 0, 64, 64);
+            ctx.fillStyle = '#214c2b'; ctx.fillRect(0, 0, 32, 32); ctx.fillRect(32, 32, 32, 32);
+            
+            const tex = new THREE.CanvasTexture(canvasElement);
+            tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(480, 480); 
+            return tex;
+        }
+
+        function buildSimulationWorld() {
+            groundTex = generatePerformanceTexture();
+            terrainMesh = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000), new THREE.MeshLambertMaterial({ map: groundTex }));
+            terrainMesh.rotateX(-Math.PI / 2);
+            scene.add(terrainMesh);
+            updateProceduralMap(true);
+        }
+
+        function seededRandom(cx, cz) {
+            let h = (cx * 374761393) ^ (cz * 668265263);
+            h = Math.sin(h) * 43758.5453123;
+            let seed = h - Math.floor(h);
+            return function() {
+                seed = (seed * 9301 + 49297) % 233280;
+                return seed / 233280;
+            };
+        }
+
+        function updateProceduralMap(forceUpdate = false) {
+            const currentChunkX = Math.floor(vehicleStateVector.pos.x / CONFIG.chunkSize);
+            const currentChunkZ = Math.floor(vehicleStateVector.pos.z / CONFIG.chunkSize);
+
+            if (!forceUpdate && currentChunkX === lastChunkX && currentChunkZ === lastChunkZ) return;
+            
+            lastChunkX = currentChunkX; lastChunkZ = currentChunkZ;
+            const visibleKeys = new Set();
+
+            for (let x = currentChunkX - CONFIG.renderRadius; x <= currentChunkX + CONFIG.renderRadius; x++) {
+                for (let z = currentChunkZ - CONFIG.renderRadius; z <= currentChunkZ + CONFIG.renderRadius; z++) {
+                    const key = `${x},${z}`; visibleKeys.add(key);
+                    if (!activeChunks.has(key)) generateChunkSector(x, z, key);
+                }
+            }
+
+            for (const [key, chunkData] of activeChunks.entries()) {
+                if (!visibleKeys.has(key)) {
+                    scene.remove(chunkData.stems, chunkData.crowns);
+                    chunkData.stems.dispose(); chunkData.crowns.dispose();
+                    activeChunks.delete(key);
+                }
+            }
+        }
+
+        function generateChunkSector(cx, cz, key) {
+            const instStems = new THREE.InstancedMesh(stemGeo, stemMat, CONFIG.treesPerChunk);
+            const instCrowns = new THREE.InstancedMesh(crownGeo, crownMat, CONFIG.treesPerChunk);
+            const rand = seededRandom(cx, cz);
+
+            for (let i = 0; i < CONFIG.treesPerChunk; i++) {
+                const px = (cx * CONFIG.chunkSize) + rand() * CONFIG.chunkSize;
+                const pz = (cz * CONFIG.chunkSize) + rand() * CONFIG.chunkSize;
+
+                if (Math.abs(px) < 35 && Math.abs(pz) < 35) { 
+                    dummy.position.set(px, -500, pz); dummy.scale.setScalar(0); dummy.updateMatrix();
+                    instStems.setMatrixAt(i, dummy.matrix); instCrowns.setMatrixAt(i, dummy.matrix);
+                    continue;
+                }
+
+                const scale = 0.75 + rand() * 0.8;
+                const rot = rand() * Math.PI;
+
+                dummy.position.set(px, 2.0 * scale, pz); dummy.scale.setScalar(scale); dummy.rotation.set(0, rot, 0); dummy.updateMatrix();
+                instStems.setMatrixAt(i, dummy.matrix);
+
+                dummy.position.set(px, (4.0 + 2.0) * scale, pz); dummy.updateMatrix();
+                instCrowns.setMatrixAt(i, dummy.matrix);
+            }
+
+            instStems.matrixAutoUpdate = false; instCrowns.matrixAutoUpdate = false;
+            scene.add(instStems, instCrowns);
+            activeChunks.set(key, { stems: instStems, crowns: instCrowns });
+        }
+
+        // --- SUB-GRID SOLID SPATIAL BOUNDARY VERIFICATION ---
+        function checkSpatialTreeCollisions(posX, posZ) {
+            const cx = Math.floor(posX / CONFIG.chunkSize);
+            const cz = Math.floor(posZ / CONFIG.chunkSize);
+            const boundaryRadius = 1.6; 
+
+            for (let x = cx - 1; x <= cx + 1; x++) {
+                for (let z = cz - 1; z <= cz + 1; z++) {
+                    const rand = seededRandom(x, z);
+                    for (let i = 0; i < CONFIG.treesPerChunk; i++) {
+                        const px = (x * CONFIG.chunkSize) + rand() * CONFIG.chunkSize;
+                        const pz = (z * CONFIG.chunkSize) + rand() * CONFIG.chunkSize;
+                        
+                        if (Math.abs(px) < 35 && Math.abs(pz) < 35) continue;
+
+                        const scale = 0.75 + rand() * 0.8;
+                        const dx = posX - px;
+                        const dz = posZ - pz;
+                        const radialDist = Math.sqrt(dx * dx + dz * dz);
+
+                        if (radialDist < boundaryRadius) {
+                            return { x: px, z: pz, dx: dx, dz: dz, dist: radialDist };
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        // --- AIRPLANE STATE MATRIX & AERONAUTICAL ASSEMBLY ---
+        const vehicleStateVector = { pos: new THREE.Vector3(0, 0.6, 0), velocity: 0, heading: 0 };
+        let vehicleChassisNode, aircraftPropellerNode;
+        let localPlayerBox = new THREE.Box3(); // Local AABB container
+
+        function createAirplaneMeshComponents() {
+            const planeGroup = new THREE.Group();
+            
+            const bodyMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.2, 5.2, 8), new THREE.MeshLambertMaterial({ color: 0xdddddd }));
+            bodyMesh.rotation.x = Math.PI / 2; bodyMesh.position.y = 0.6; planeGroup.add(bodyMesh);
+
+            const canopy = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.35, 1.2), new THREE.MeshLambertMaterial({ color: 0x33bbaa, transparent: true, opacity: 0.6 }));
+            canopy.position.set(0, 1.0, 0.3); planeGroup.add(canopy);
+
+            const wingMesh = new THREE.Mesh(new THREE.BoxGeometry(CONFIG.plane.width, 0.08, 1.3), new THREE.MeshLambertMaterial({ color: 0xcc0000 }));
+            wingMesh.position.set(0, 0.6, 0.6); planeGroup.add(wingMesh);
+
+            const hStab = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.06, 0.6), new THREE.MeshLambertMaterial({ color: 0xcc0000 }));
+            hStab.position.set(0, 0.6, -2.1); planeGroup.add(hStab);
+
+            const vStab = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.2, 0.6), new THREE.MeshLambertMaterial({ color: 0xdddddd }));
+            vStab.position.set(0, 1.1, -2.1); planeGroup.add(vStab);
+
+            const propNode = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.14, 0.04), new THREE.MeshLambertMaterial({ color: 0x222222 }));
+            propNode.position.set(0, 0.6, 2.65); planeGroup.add(propNode);
+
+            return { group: planeGroup, prop: propNode };
+        }
+
+        function constructArcadeAirplane() {
+            const planeAssets = createAirplaneMeshComponents();
+            vehicleChassisNode = planeAssets.group;
+            aircraftPropellerNode = planeAssets.prop;
+            scene.add(vehicleChassisNode);
+        }
+
+        function resetSimulationCoordinates() {
+            vehicleStateVector.pos.set(0, 0.6, 0);
+            vehicleStateVector.velocity = 0; vehicleStateVector.heading = 0;
+            state.speed = 0; state.gear = 1; state.rpm = CONFIG.powertrain.idleRpm;
+            state.airplane.pitch = 0; state.airplane.roll = 0;
+            updateProceduralMap(true);
+        }
+
+        // --- REALTIME AABB INTERSECTION NETWORK FILTER ---
+        function handlePeerAircraftCollisions(nextX, nextY, nextZ) {
+            localPlayerBox.min.set(nextX - (CONFIG.plane.width / 2), nextY, nextZ - (CONFIG.plane.length / 2));
+            localPlayerBox.max.set(nextX + (CONFIG.plane.width / 2), nextY + 1.5, nextZ + (CONFIG.plane.length / 2));
+
+            for (const [peerId, peerData] of networkState.remotePlayers.entries()) {
+                if (!peerData.boundingBox) continue;
+
+                if (localPlayerBox.intersectsBox(peerData.boundingBox)) {
+                    const pPos = peerData.mesh.position;
+                    const dx = nextX - pPos.x;
+                    const dy = nextY - pPos.y;
+                    const dz = nextZ - pPos.z;
+                    const linearDist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.001;
+
+                    vehicleStateVector.heading += (dx > 0 ? 1 : -1) * 0.8;
+                    vehicleStateVector.velocity *= -0.4; 
+
+                    broadcastNetworkFrame(true);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // --- 9-GEAR SIMULATION FLIGHT KINETICS ENGINE ---
+        function updateSimulationPhysics(deltaTime) {
+            const profile = CONFIG.plane;
+            const numGears = profile.gears.length;
+            const inputForward = state.keys.w;
+            const inputReverse = state.keys.s;
+
+            let gearRatio = profile.gears[Math.max(0, state.gear - 1)];
+
+            const propShaftRpm = (Math.abs(vehicleStateVector.velocity) / CONFIG.powertrain.propRadius) * 9.549297;
+            let targetEngineRpm = propShaftRpm * gearRatio * 4.5;
+            if (targetEngineRpm < CONFIG.powertrain.idleRpm) targetEngineRpm = CONFIG.powertrain.idleRpm;
+            state.rpm += (targetEngineRpm - state.rpm) * 22.0 * deltaTime;
+
+            if (state.rpm > 5900 && state.gear < numGears) { state.gear++; state.rpm -= 1350; }
+            else if (state.rpm < 2300 && state.gear > 1) { state.gear--; state.rpm += 1050; }
+
+            if (inputForward) {
+                const rpmRatio = state.rpm / CONFIG.powertrain.redlineRpm;
+                const activeTorque = profile.torque * (1.0 - Math.pow(rpmRatio - 0.6, 2));
+                const kineticThrustForce = (activeTorque * gearRatio * 4.5) / CONFIG.powertrain.propRadius;
+                vehicleStateVector.velocity += (kineticThrustForce / profile.mass) * deltaTime;
+            } else if (inputReverse) {
+                const airBrakingResistance = 60.0 * deltaTime;
+                if (vehicleStateVector.velocity <= airBrakingResistance) vehicleStateVector.velocity = 0;
+                else vehicleStateVector.velocity -= airBrakingResistance;
+            } else {
+                const parasiticDrag = 4.0 * deltaTime;
+                if (vehicleStateVector.velocity <= parasiticDrag) vehicleStateVector.velocity = 0;
+                else vehicleStateVector.velocity -= parasiticDrag;
+            }
+
+            vehicleStateVector.velocity -= (vehicleStateVector.velocity * vehicleStateVector.velocity) * 0.00085 * deltaTime;
+
+            const speedMaxVector = profile.maxSpeed / 3.6;
+            if (vehicleStateVector.velocity > speedMaxVector) vehicleStateVector.velocity = speedMaxVector;
+            if (vehicleStateVector.velocity < 0) vehicleStateVector.velocity = 0;
+
+            state.speed = vehicleStateVector.velocity * 3.6;
+
+            let targetAltitude = 0.6;
+            let targetPitch = 0;
+            
+            if (state.speed > 120) {
+                targetAltitude = 0.6 + ((state.speed - 120) / 280) * 45.0;
+                if (vehicleStateVector.pos.y < targetAltitude - 0.5) targetPitch = 0.18;
+            }
+
+            let nextY = vehicleStateVector.pos.y + (targetAltitude - vehicleStateVector.pos.y) * 2.0 * deltaTime;
+            state.airplane.pitch += (targetPitch - state.airplane.pitch) * 4.0 * deltaTime;
+
+            let steeringInput = 0;
+            let targetRoll = 0;
+            if (state.keys.a) { steeringInput = 1.1; targetRoll = 0.6; }
+            if (state.keys.d) { steeringInput = -1.1; targetRoll = -0.6; }
+
+            vehicleStateVector.heading += steeringInput * deltaTime;
+            state.airplane.roll += (targetRoll - state.airplane.roll) * 5.0 * deltaTime;
+
+            let nextX = vehicleStateVector.pos.x + Math.sin(vehicleStateVector.heading) * vehicleStateVector.velocity * deltaTime;
+            let nextZ = vehicleStateVector.pos.z + Math.cos(vehicleStateVector.heading) * vehicleStateVector.velocity * deltaTime;
+
+            let multiplayerCollisionOccurred = false;
+            if (networkState.isMultiplayer) {
+                multiplayerCollisionOccurred = handlePeerAircraftCollisions(nextX, nextY, nextZ);
+            }
+
+            let treeCollisionDetected = false;
+            if (!multiplayerCollisionOccurred && vehicleStateVector.pos.y < 12.0) {
+                const collisionReport = checkSpatialTreeCollisions(nextX, nextZ);
+                if (collisionReport) {
+                    treeCollisionDetected = true;
+                    
+                    const outNx = collisionReport.dx / collisionReport.dist;
+                    const outNz = collisionReport.dz / collisionReport.dist;
+                    vehicleStateVector.pos.x = collisionReport.x + outNx * 1.75;
+                    vehicleStateVector.pos.z = collisionReport.z + outNz * 1.75;
+
+                    const lateralSwerveSign = collisionReport.dx > 0 ? 1 : -1;
+                    const kineticSwerveDeflection = (state.speed / profile.maxSpeed) * 2.5 + 0.5;
+                    vehicleStateVector.heading += lateralSwerveSign * kineticSwerveDeflection;
+
+                    vehicleStateVector.velocity *= -0.2; 
+                }
+            }
+
+            if (!treeCollisionDetected && !multiplayerCollisionOccurred) {
+                vehicleStateVector.pos.x = nextX;
+                vehicleStateVector.pos.y = nextY;
+                vehicleStateVector.pos.z = nextZ;
+            }
+
+            vehicleChassisNode.position.copy(vehicleStateVector.pos);
+            vehicleChassisNode.rotation.set(0, vehicleStateVector.heading, 0);
+            vehicleChassisNode.rotateX(-state.airplane.pitch);
+            vehicleChassisNode.rotateZ(state.airplane.roll);
+
+            if (aircraftPropellerNode) aircraftPropellerNode.rotation.z += (state.rpm * 0.015);
+        }
+
+        // --- NETWORK COHERENCE SYNCHRONIZER ENGINE ---
+        function initializeNetworkChannel(roomCode) {
+            networkState.isMultiplayer = true;
+            networkState.roomCode = roomCode;
+            document.getElementById('room-info-display').innerText = `ROOM: ${roomCode} (${networkState.isHost ? 'HOST' : 'CLIENT'})`;
+
+            networkState.channel = new BroadcastChannel(`flight_sim_lan_channel_${roomCode}`);
+            
+            networkState.channel.onmessage = (event) => {
+                const packet = event.data;
+                if (!packet || packet.clientId === networkState.localClientId) return;
+
+                if (packet.type === 'sync') {
+                    let peer = networkState.remotePlayers.get(packet.clientId);
+                    if (!peer) {
+                        const assets = createAirplaneMeshComponents();
+                        scene.add(assets.group);
+                        
+                        peer = {
+                            mesh: assets.group,
+                            propNode: assets.prop,
+                            boundingBox: new THREE.Box3(),
+                            pos: new THREE.Vector3(),
+                            heading: 0, pitch: 0, roll: 0
+                        };
+                        networkState.remotePlayers.set(packet.clientId, peer);
+                    }
+
+                    peer.pos.set(packet.px, packet.py, packet.pz);
+                    peer.heading = packet.heading;
+                    peer.pitch = packet.pitch;
+                    peer.roll = packet.roll;
+                    peer.rpm = packet.rpm;
+                    peer.lastUpdate = performance.now();
+                } else if (packet.type === 'disconnect') {
+                    purgeNetworkPeer(packet.clientId);
+                }
+            };
+
+            window.addEventListener('beforeunload', terminateNetworkPipeline);
+        }
+
+        function broadcastNetworkFrame(force = false) {
+            if (!networkState.isMultiplayer || !networkState.channel) return;
+            
+            const now = performance.now();
+            if (!force && (now - networkState.lastBroadcastTime) / 1000 < networkState.broadcastInterval) return;
+            networkState.lastBroadcastTime = now;
+
+            networkState.channel.postMessage({
+                type: 'sync',
+                clientId: networkState.localClientId,
+                px: vehicleStateVector.pos.x,
+                py: vehicleStateVector.pos.y,
+                pz: vehicleStateVector.pos.z,
+                heading: vehicleStateVector.heading,
+                pitch: state.airplane.pitch,
+                roll: state.airplane.roll,
+                rpm: state.rpm
+            });
+        }
+
+        function updateNetworkPeers(deltaTime) {
+            const now = performance.now();
+            const disconnectTimeout = 4000; 
+
+            for (const [peerId, peerData] of networkState.remotePlayers.entries()) {
+                if (now - peerData.lastUpdate > disconnectTimeout) {
+                    purgeNetworkPeer(peerId);
+                    continue;
+                }
+
+                peerData.mesh.position.lerp(peerData.pos, 12.0 * deltaTime);
+                
+                peerData.mesh.rotation.set(0, peerData.heading, 0);
+                peerData.mesh.rotateX(-peerData.pitch);
+                peerData.mesh.rotateZ(peerData.roll);
+
+                if (peerData.propNode) {
+                    peerData.propNode.rotation.z += (peerData.rpm * 0.015);
+                }
+
+                peerData.boundingBox.min.set(
+                    peerData.mesh.position.x - (CONFIG.plane.width / 2),
+                    peerData.mesh.position.y,
+                    peerData.mesh.position.z - (CONFIG.plane.length / 2)
+                );
+                peerData.boundingBox.max.set(
+                    peerData.mesh.position.x + (CONFIG.plane.width / 2),
+                    peerData.mesh.position.y + 1.5,
+                    peerData.mesh.position.z + (CONFIG.plane.length / 2)
+                );
+            }
+        }
+
+        function purgeNetworkPeer(clientId) {
+            const peer = networkState.remotePlayers.get(clientId);
+            if (peer) {
+                scene.remove(peer.mesh);
+                networkState.remotePlayers.delete(clientId);
+            }
+        }
+
+        function terminateNetworkPipeline() {
+            if (networkState.channel) {
+                networkState.channel.postMessage({
+                    type: 'disconnect',
+                    clientId: networkState.localClientId
+                });
+                networkState.channel.close();
+            }
+        }
+
+        // --- CAMERA WARPING SYSTEM ---
+        function updateSimulationCamera(deltaTime) {
+            const maxVelocityCeiling = 400;
+            if (state.cameraMode === 0) { 
+                const localOff = _v1.set(0, 0.95, 0.3);
+                localOff.applyEuler(vehicleChassisNode.rotation);
+                camera.position.copy(vehicleStateVector.pos).add(localOff);
+                
+                _v2.set(0, 0.95, 5.0).applyEuler(vehicleChassisNode.rotation).add(vehicleStateVector.pos);
+                camera.lookAt(_v2);
+            } else { 
+                let targetedFovValue = 60 + (state.speed / maxVelocityCeiling) * 38; 
+                camera.fov += (targetedFovValue - camera.fov) * 4.5 * deltaTime;
+                camera.updateProjectionMatrix();
+
+                _euler.set(0, vehicleStateVector.heading, 0);
+                const trailingCamOffset = _v1.set(0, 2.5, -8.2);
+                trailingCamOffset.applyEuler(_euler);
+                _v2.copy(vehicleStateVector.pos).add(trailingCamOffset);
+                
+                laggedCamPos.lerp(_v2, 7.2 * deltaTime);
+                camera.position.copy(laggedCamPos);
+
+                if (state.speed > 40) {
+                    const structuralVibeMagnitude = ((state.speed - 40) / maxVelocityCeiling) * 0.11;
+                    camera.position.x += (Math.random() - 0.5) * structuralVibeMagnitude;
+                    camera.position.y += (Math.random() - 0.5) * structuralVibeMagnitude;
+                    camera.position.z += (Math.random() - 0.5) * structuralVibeMagnitude;
+                }
+                
+                _v1.copy(vehicleStateVector.pos).y += 0.75;
+                camera.lookAt(_v1);
+            }
+        }
+
+        // --- SYNTHETIC POWERPLANT SYNTHESIZER ---
+        let audioCtx, engineOscillator, masterGainNode;
+
+        function configureSimulationAudio() {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioCtx();
+            engineOscillator = audioCtx.createOscillator();
+            engineOscillator.type = 'sawtooth';
+            
+            const lowpassFilter = audioCtx.createBiquadFilter();
+            lowpassFilter.type = 'lowpass'; lowpassFilter.frequency.value = 420;
+            
+            masterGainNode = audioCtx.createGain(); masterGainNode.gain.value = 0.0;
+            engineOscillator.connect(lowpassFilter); lowpassFilter.connect(masterGainNode);
+            masterGainNode.connect(audioCtx.destination); engineOscillator.start();
+        }
+
+        function refreshAudioSynthesisPipeline() {
+            if (!audioCtx) return;
+            engineOscillator.frequency.setTargetAtTime(18.0 + (state.rpm / CONFIG.powertrain.redlineRpm) * 190, audioCtx.currentTime, 0.04);
+            const activeInputHold = state.keys.w || state.keys.s;
+            masterGainNode.gain.setTargetAtTime((activeInputHold ? 0.23 : 0.08) * state.volume, audioCtx.currentTime, 0.04);
+        }
+
+        // --- UI INTERFACE REFRESH MATRIX ---
+        const hudSpeed = document.getElementById('speed-value');
+        const hudGear = document.getElementById('gear-display');
+        const hudRpmText = document.getElementById('rpm-text');
+        const hudRpmBar = document.getElementById('rpm-bar');
+        
+        // Kordinat DOM element referansları
+        const coordXEl = document.getElementById('coord-x');
+        const coordYEl = document.getElementById('coord-y');
+        const coordZEl = document.getElementById('coord-z');
+        
+        function syncUserInterfaceHUD() {
+            hudSpeed.innerText = Math.floor(state.speed);
+            hudGear.innerText = 'D' + state.gear;
+            hudRpmText.innerText = Math.floor(state.rpm) + " RPM";
+            hudRpmBar.style.width = Math.max(0, Math.min(100, ((state.rpm - 900) / 5700) * 100)) + "%";
+            
+            // Çizilmiş yüzey karelerinin boyutuna (6.25 birim) göre hizalanmış tam senkronize XYZ koordinat hesaplaması
+            coordXEl.innerText = (vehicleStateVector.pos.x / 6.25).toFixed(1);
+            coordYEl.innerText = (vehicleStateVector.pos.y).toFixed(1);
+            coordZEl.innerText = (vehicleStateVector.pos.z / 6.25).toFixed(1);
+        }
+
+        // --- EVENT INTERCEPTORS ---
+        document.addEventListener('keydown', (e) => {
+            const k = e.key.toLowerCase();
+            if (state.keys.hasOwnProperty(k)) state.keys[k] = true;
+            if (k === 'c') { state.cameraMode = state.cameraMode === 0 ? 1 : 0; if (state.cameraMode === 1) laggedCamPos.copy(camera.position); }
+            if (k === 'r') resetSimulationCoordinates();
+            if (e.key === 'Escape') toggleSettingsMenu();
+        });
+
+        document.addEventListener('keyup', (e) => {
+            const k = e.key.toLowerCase();
+            if (state.keys.hasOwnProperty(k)) state.keys[k] = false;
+        });
+
+        const settingsMenuOverlay = document.getElementById('settings-menu');
+        function toggleSettingsMenu() { settingsMenuOverlay.style.display = settingsMenuOverlay.style.display === 'flex' ? 'none' : 'flex'; }
+
+        document.getElementById('settings-btn').addEventListener('click', toggleSettingsMenu);
+        document.getElementById('btn-close-settings').addEventListener('click', toggleSettingsMenu);
+        document.getElementById('set-volume').addEventListener('input', (e) => document.getElementById('vol-val').innerText = e.target.value);
+
+        // --- MAIN MENU INTERFACE ROUTING EVENT INTERCEPTORS ---
+        const mainMenuGrp = document.getElementById('main-menu-group');
+        const lanMenuGrp = document.getElementById('lan-menu-group');
+
+        document.getElementById('mode-single-btn').addEventListener('click', () => {
+            launchFlightEngine('Singleplayer', false);
+        });
+
+        document.getElementById('mode-multi-btn').addEventListener('click', () => {
+            mainMenuGrp.style.display = 'none';
+            lanMenuGrp.style.display = 'flex';
+        });
+
+        document.getElementById('back-to-main-btn').addEventListener('click', () => {
+            lanMenuGrp.style.display = 'none';
+            mainMenuGrp.style.display = 'flex';
+        });
+
+        document.getElementById('host-room-btn').addEventListener('click', () => {
+            const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
+            networkState.isHost = true;
+            launchFlightEngine(randomCode, true);
+        });
+
+        document.getElementById('join-room-btn').addEventListener('click', () => {
+            const inputField = document.getElementById('join-code-input');
+            const code = inputField.value.trim();
+            if (code.length === 4 && !isNaN(code)) {
+                networkState.isHost = false;
+                launchFlightEngine(code, true);
+            } else {
+                alert('Lütfen geçerli 4 haneli bir oda kodu girin!');
+                inputField.value = '';
+                inputField.focus();
+            }
+        });
+
+        // --- ENGINE LAUNCH SEQUENCE ---
+        function launchFlightEngine(roomCode, isMulti) {
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('ui-layer').style.display = 'block';
+            
+            buildSimulationWorld();
+            constructArcadeAirplane();
+            configureSimulationAudio();
+            resetSimulationCoordinates();
+
+            if (isMulti) {
+                initializeNetworkChannel(roomCode);
+            }
+            
+            state.isRunning = true;
+            clock.start();
+            mainLoop();
+        }
+
+        // --- TICK PROCESS MATRIX ---
+        const clock = new THREE.Clock();
+
+        function mainLoop() {
+            requestAnimationFrame(mainLoop);
+            if (!state.isRunning) return;
+
+            const dt = Math.min(clock.getDelta(), 0.02); 
+            
+            updateSimulationPhysics(dt);
+            if (networkState.isMultiplayer) {
+                broadcastNetworkFrame();
+                updateNetworkPeers(dt);
+            }
+            updateProceduralMap(); 
+            updateSimulationCamera(dt);
+            refreshAudioSynthesisPipeline();
+            syncUserInterfaceHUD();
+
+            terrainMesh.position.set(vehicleStateVector.pos.x, 0, vehicleStateVector.pos.z);
+            groundTex.offset.x = vehicleStateVector.pos.x / 6.25;
+            groundTex.offset.y = -vehicleStateVector.pos.z / 6.25;
+
+            dirLight.position.set(vehicleStateVector.pos.x + 30, vehicleStateVector.pos.y + 80, vehicleStateVector.pos.z + 20);
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
