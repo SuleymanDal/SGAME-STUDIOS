@@ -1,0 +1,98 @@
+<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>CukkoClimb</title><style>@import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');body{margin:0;overflow:hidden;background:#87CEEB;font-family:'Fredoka One',cursive;user-select:none;}#canvas{display:block;width:100vw;height:100vh;}.score-board{position:absolute;top:15px;width:100%;text-align:center;pointer-events:none;}.score-text{font-size:min(8vw,42px);color:#FFD700;-webkit-text-stroke:2px #D2691E;text-shadow:4px 4px 0 #8B4513;}.controls{position:absolute;bottom:20px;right:20px;display:flex;gap:15px;z-index:10;}.btn-pedal{width:min(18vw,80px);height:min(28vw,130px);border:4px solid #fff;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:min(4vw,18px);box-shadow:0 6px 0 #111;cursor:pointer;}.btn-gas{background:linear-gradient(180deg,#2ecc71,#27ae60);}.btn-brake{background:linear-gradient(180deg,#e74c3c,#c0392b);}.gauge-container{position:absolute;bottom:20px;left:20px;width:min(30vw,140px);height:min(30vw,140px);background:rgba(0,0,0,0.6);border-radius:50%;border:4px solid #fff;pointer-events:none;}</style></head>
+<body><div class="score-board"><div class="score-text">MESAFE: <span id="dist">0</span>m</div></div><div class="gauge-container"><canvas id="gaugeCanvas"></canvas></div><div class="controls"><div id="btnBrake" class="btn-pedal btn-brake">FREN</div><div id="btnGas" class="btn-pedal btn-gas">GAZ</div></div><canvas id="canvas"></canvas>
+<script>
+const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d'),gCanvas=document.getElementById('gaugeCanvas'),gCtx=gCanvas.getContext('2d');
+function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;gCanvas.width=Math.min(window.innerWidth*0.3,140);gCanvas.height=gCanvas.width;}window.addEventListener('resize',resize);resize();
+
+// --- GELİŞMİŞ TRAKTÖR SES SENTEZLEYİCİSİ ---
+let actx=null,popBuffer=null,nextPopTime=0,masterGain=null,filterNode=null;
+function initAudio(){
+    if(actx)return;
+    actx=new(window.AudioContext||window.webkitAudioContext)();
+    
+    // Doğal piston patlama sesi oluşturma (AudioBuffer)
+    let sampleRate=actx.sampleRate, length=Math.floor(sampleRate*0.08), buffer=actx.createBuffer(1,length,sampleRate), data=buffer.getChannelData(0);
+    for(let i=0; i<length; i++){
+        let t=i/sampleRate;
+        // Piston patlaması: Düşük frekanslı tok vuruntu + üst ses harmanı
+        let pop=Math.sin(2*Math.PI*65*t)*Math.exp(-t*35);
+        let subPop=Math.sin(2*Math.PI*35*t)*Math.exp(-t*20);
+        let noise=(Math.random()*2-1)*Math.exp(-t*80);
+        data[i]=pop*0.6 + subPop*0.3 + noise*0.2;
+    }
+    popBuffer=buffer;
+    
+    filterNode=actx.createBiquadFilter();
+    filterNode.type='lowpass';
+    filterNode.frequency.setValueAtTime(400,actx.currentTime);
+    
+    masterGain=actx.createGain();
+    masterGain.gain.setValueAtTime(0.5,actx.currentTime);
+    
+    filterNode.connect(masterGain);
+    masterGain.connect(actx.destination);
+    nextPopTime=actx.currentTime;
+}
+
+function playPistonPop(time, rpmRatio){
+    if(!actx || !popBuffer) return;
+    let src=actx.createBufferSource();
+    src.buffer=popBuffer;
+    
+    // Devir arttıkça ses tonu biraz daha keskinleşir
+    src.playbackRate.value = 0.8 + rpmRatio * 0.7;
+    
+    let gain=actx.createGain();
+    gain.gain.value = 0.4 + rpmRatio * 0.6;
+    
+    src.connect(gain);
+    gain.connect(filterNode);
+    src.start(time);
+}
+
+function updateEngineAudio(rpm){
+    if(!actx) return;
+    let ratio=(rpm-800)/2200; // 0..1
+    let popsPerSec = 7 + ratio * 33; // 800 RPM'de ~7 patlama/sn (traktör rölantisi), 3000 RPM'de ~40 patlama/sn
+    let interval = 1 / popsPerSec;
+    
+    // Filtre frekansını devire göre ayarla (egzoz gürleşmesi)
+    filterNode.frequency.setTargetAtTime(350 + ratio * 1200, actx.currentTime, 0.05);
+    
+    let now=actx.currentTime;
+    while(nextPopTime < now + 0.1){
+        playPistonPop(nextPopTime, ratio);
+        nextPopTime += interval;
+    }
+}
+
+const GRAVITY=0.3,WHEEL_R=16,SPRING_K=0.18,DAMPING=0.88,REST_LEN=32,MAX_SPEED=7;let car,keys={right:false,left:false},gameOver=false;
+function resetCar(){car={x:150,y:getGround(150)-REST_LEN-WHEEL_R-10,vx:0,vy:0,angle:0,angVel:0,rpm:800,wheels:[{offset:-35,len:REST_LEN,vLen:0},{offset:35,len:REST_LEN,vLen:0}]};gameOver=false;}
+const bind=(el,k)=>{const s=e=>{e.preventDefault();initAudio();if(gameOver)resetCar();keys[k]=true;};const end=e=>{e.preventDefault();keys[k]=false;};el.addEventListener('touchstart',s);el.addEventListener('touchend',end);el.addEventListener('mousedown',s);el.addEventListener('mouseup',end);el.addEventListener('mouseleave',end);};bind(document.getElementById('btnGas'),'right');bind(document.getElementById('btnBrake'),'left');
+window.addEventListener('keydown',e=>{initAudio();if(gameOver)resetCar();if(e.key.toLowerCase()==='d'||e.key==='ArrowRight')keys.right=true;if(e.key.toLowerCase()==='a'||e.key==='ArrowLeft')keys.left=true;});window.addEventListener('keyup',e=>{if(e.key.toLowerCase()==='d'||e.key==='ArrowRight')keys.right=false;if(e.key.toLowerCase()==='a'||e.key==='ArrowLeft')keys.left=false;});
+function getGround(x){return Math.sin(x*0.003)*110+Math.sin(x*0.007)*35+Math.cos(x*0.001)*70;}resetCar();
+function getNorm(x){let dx=1,dy=getGround(x+dx)-getGround(x-dx),l=Math.hypot(2,dy);return{nx:-dy/l,ny:2/l};}
+function stepPhysics(){if(gameOver)return;car.vy+=GRAVITY*0.5;let cos=Math.cos(car.angle),sin=Math.sin(car.angle),grounded=0,hX=car.x-sin*35,hY=car.y-cos*35;if(hY+10>=getGround(hX)){gameOver=true;setTimeout(()=>resetCar(),1000);return;}
+let wPos=[];car.wheels.forEach((w,i)=>{let wx=car.x+w.offset*cos-sin*w.len,wy=car.y+w.offset*sin+cos*w.len,gy=getGround(wx),norm=getNorm(wx),overlap=(wy+WHEEL_R)-gy;wPos.push({wx,wy,overlap});
+if(overlap>0){grounded++;car.y-=norm.ny*overlap*0.25;car.x-=norm.nx*overlap*0.25;let springF=overlap*SPRING_K,dampF=w.vLen*DAMPING,f=springF-dampF;w.vLen-=f*0.12;car.vy-=norm.ny*f*0.15;car.vx-=norm.nx*f*0.15;
+if(keys.right){car.vx+=norm.ny*0.35;car.vy+=-norm.nx*0.35;car.angVel-=(i===0?0.0008:0.0002);car.rpm=Math.min(3000,car.rpm+25);}
+if(keys.left){car.vx-=norm.ny*0.3;car.vy-=-norm.nx*0.3;if(i===1){car.angVel+=0.0018;w.len=Math.max(20,w.len-0.6);}car.rpm=Math.min(2200,car.rpm+20);}
+car.vx*=0.999;}else{w.vLen+=(REST_LEN-w.len)*0.08;}w.vLen*=0.8;w.len=Math.max(15,Math.min(35,w.len+w.vLen));});
+let frontWheel=wPos[1];if(keys.left&&frontWheel.overlap<=0){car.angVel+=0.007;}
+if(grounded===2){let wheelAngle=Math.atan2(wPos[1].wy-wPos[0].wy,wPos[1].wx-wPos[0].wx);car.angVel+=(wheelAngle-car.angle)*0.03;}
+else if(grounded===0){let flightAngle=Math.atan2(car.vy,Math.max(2,car.vx))*0.4;car.angVel+=(flightAngle-car.angle)*0.015;if(keys.right)car.angVel-=0.0015;if(keys.left)car.angVel+=0.007;car.vx*=0.9998;}
+if(!keys.right&&!keys.left)car.rpm=Math.max(800,car.rpm-25);
+car.vx=Math.max(-MAX_SPEED,Math.min(MAX_SPEED,car.vx));
+car.x+=car.vx*0.5;car.y+=car.vy*0.5;car.angle+=car.angVel*0.5;car.angVel*=0.94;}
+
+function update(){
+    stepPhysics();
+    stepPhysics();
+    updateEngineAudio(car.rpm);
+    document.getElementById('dist').innerText=Math.max(0,Math.floor(car.x/50));
+}
+
+function drawGauge(){let w=gCanvas.width,r=w/2;gCtx.clearRect(0,0,w,w);gCtx.save();gCtx.translate(r,r);gCtx.beginPath();gCtx.arc(0,0,r-8,0.75*Math.PI,2.25*Math.PI);gCtx.strokeStyle="#fff";gCtx.lineWidth=4;gCtx.stroke();gCtx.fillStyle="#fff";gCtx.font="bold 9px sans-serif";gCtx.textAlign="center";for(let i=0;i<=3;i++){let a=0.75*Math.PI+(i/3)*1.5*Math.PI;gCtx.fillText(i,Math.cos(a)*(r-20),Math.sin(a)*(r-20)+3);}gCtx.fillStyle="#FFD700";gCtx.fillText("RPM x1000",0,r-30);let a=0.75*Math.PI+(car.rpm/3000)*1.5*Math.PI;gCtx.rotate(a);gCtx.beginPath();gCtx.moveTo(0,0);gCtx.lineTo(r-14,0);gCtx.strokeStyle="#ff4757";gCtx.lineWidth=3;gCtx.stroke();gCtx.restore();}
+function drawSpring(x1,y1,x2,y2,coils=5,width=6){let dx=x2-x1,dy=y2-y1,dist=Math.hypot(dx,dy),angle=Math.atan2(dy,dx);ctx.save();ctx.translate(x1,y1);ctx.rotate(angle);ctx.beginPath();ctx.strokeStyle="#333";ctx.lineWidth=2.5;ctx.moveTo(0,0);let step=dist/coils;for(let i=0;i<coils;i++){let x=(i+0.5)*step,y=(i%2===0?1:-1)*width;ctx.lineTo(x,y);}ctx.lineTo(dist,0);ctx.stroke();ctx.restore();}
+function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);let camX=car.x-canvas.width*0.35,camY=car.y-canvas.height*0.65;ctx.save();ctx.translate(-camX,-camY);ctx.beginPath();ctx.fillStyle="#8B5A2B";let sX=camX-100,eX=camX+canvas.width+100;ctx.moveTo(sX,camY+canvas.height+600);for(let x=sX;x<=eX;x+=10)ctx.lineTo(x,getGround(x));ctx.lineTo(eX,camY+canvas.height+600);ctx.fill();ctx.beginPath();ctx.strokeStyle="#2E8B57";ctx.lineWidth=14;for(let x=sX;x<=eX;x+=10)ctx.lineTo(x,getGround(x));ctx.stroke();let cos=Math.cos(car.angle),sin=Math.sin(car.angle);car.wheels.forEach(w=>{let tx=car.x+w.offset*cos,ty=car.y+w.offset*sin,bx=car.x+w.offset*cos-sin*w.len,by=car.y+w.offset*sin+cos*w.len;drawSpring(tx,ty,bx,by);ctx.fillStyle="#111";ctx.beginPath();ctx.arc(bx,by,WHEEL_R,0,Math.PI*2);ctx.fill();ctx.fillStyle="#aaa";ctx.beginPath();ctx.arc(bx,by,5,0,Math.PI*2);ctx.fill();});ctx.save();ctx.translate(car.x,car.y);ctx.rotate(car.angle);ctx.fillStyle="#DC143C";ctx.beginPath();ctx.roundRect(-45,-18,90,20,6);ctx.fill();ctx.fillStyle="#222";ctx.beginPath();ctx.roundRect(-20,-32,40,15,4);ctx.fill();ctx.fillStyle="#ffcc99";ctx.beginPath();ctx.arc(0,-35,9,0,Math.PI*2);ctx.fill();ctx.fillStyle="#555";ctx.fillRect(20,-38,5,20);ctx.restore();if(gameOver){ctx.fillStyle="red";ctx.font="bold 40px sans-serif";ctx.fillText("KAYBETTİN!",car.x-100,car.y-80);}ctx.restore();update();drawGauge();requestAnimationFrame(draw);}draw();
+</script></body></html>
