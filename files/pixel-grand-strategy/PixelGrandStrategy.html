@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pixel Grand Strategy - Naval Warfare & Exploration</title>
+    <style>
+        * { box-sizing: border-box; touch-action: manipulation; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1a1a2e; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 10px; overflow-x: hidden; }
+        
+        .screen { text-align: center; background: #16213e; padding: 25px; border-radius: 15px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); width: 100%; max-width: 420px; gap: 15px; display: flex; flex-direction: column; z-index: 10; }
+        #setupScreen, #mapEditorScreen, #gameScreen { display: none; }
+        #mainMenuScreen { display: flex; }
+
+        .lang-container { display: flex; align-items: center; justify-content: center; gap: 8px; background: #0f172a; padding: 8px 12px; border-radius: 8px; border: 1px solid #533483; margin-bottom: 5px; }
+        .lang-icon { font-size: 1.2rem; }
+        #langSelect { background: transparent; color: white; border: none; outline: none; font-family: inherit; font-size: 0.95rem; cursor: pointer; flex-grow: 1; }
+        #langSelect option { background: #0f172a; color: white; }
+
+        h1 { font-size: 1.5rem; margin: 0; color: #4ecca3; }
+        h2 { font-size: 1.2rem; margin: 0; color: #4ecca3; }
+        .input-group { display: flex; flex-direction: column; align-items: flex-start; width: 100%; gap: 5px; }
+        .seed-row { display: flex; gap: 5px; width: 100%; }
+        input[type="text"], input[type="number"] { flex-grow: 1; padding: 10px; border-radius: 5px; border: 1px solid #533483; background: #0f172a; color: white; }
+        .btn { padding: 12px; font-weight: bold; cursor: pointer; border: none; border-radius: 5px; transition: 0.2s; font-size: 0.95rem; }
+        .btn:hover { opacity: 0.9; transform: scale(0.99); }
+        .primary-btn { background-color: #4ecca3; color: #1a1a2e; }
+        .secondary-btn { background-color: #533483; color: white; }
+        .danger-btn { background-color: #e94560; color: white; }
+
+        .drop-zone { border: 2px dashed #4ecca3; padding: 15px; border-radius: 8px; background: #0f172a; cursor: pointer; text-align: center; font-size: 0.85rem; color: #888; }
+        .drop-zone.hover { border-color: #ffffff; background: #1f293d; }
+        
+        .editor-tools { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+        .tool-card { width: 32px; height: 32px; border-radius: 6px; cursor: pointer; border: 2px solid transparent; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; }
+        .tool-card.active { border-color: white; transform: scale(1.1); }
+        
+        .editor-container { position: relative; width: 100%; aspect-ratio: 1/1; border: 2px solid #533483; border-radius: 8px; overflow: hidden; background: #101820; cursor: crosshair; }
+        #editorCanvas { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+
+        #gameScreen { max-width: 650px; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; width: 100%; background: #16213e; padding: 10px 15px; border-radius: 8px; border: 1px solid #533483; }
+        .speed-btn { padding: 6px 12px; font-size: 0.85rem; background-color: #2d2d44; color: white; border: 1px solid #533483; border-radius: 4px; cursor: pointer; }
+        .speed-btn.active { background-color: #4ecca3; color: #1a1a2e; font-weight: bold; }
+        
+        .canvas-container { position: relative; width: 100%; max-width: 600px; aspect-ratio: 1/1; border: 3px solid #533483; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); overflow: hidden; background-color: #000; }
+        #pixelCanvas { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+        
+        #nameOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
+        .country-label {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-weight: bold;
+            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+            white-space: nowrap;
+            pointer-events: none;
+            will-change: transform, left, top;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 1. ANA MENÜ -->
+    <div id="mainMenuScreen" class="screen">
+        <div class="lang-container">
+            <span class="lang-icon">🌍</span>
+            <select id="langSelect">
+                <option value="tr">Türkçe</option>
+                <option value="en-UK">English (UK)</option>
+                <option value="en-US">English (USA)</option>
+                <option value="es">Español</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+                <option value="ru">Русский</option>
+            </select>
+        </div>
+        <h1 id="uiTitle">Pixel Grand Strategy</h1>
+        <button type="button" class="btn primary-btn" id="btnGoSetup">BAŞLA (RASTGELE HARİTA)</button>
+        <button type="button" class="btn secondary-btn" id="btnGoEditor">HARİTA OLUŞTUR / YÜKLE</button>
+    </div>
+
+    <!-- 2. RASTGELE HARİTA AYARLARI -->
+    <div id="setupScreen" class="screen">
+        <h2 id="uiRandomTitle">Rastgele Simülasyon</h2>
+        <div class="input-group">
+            <label id="uiSeed">Seed:</label>
+            <div class="seed-row">
+                <input type="text" id="seedInput" value="12345">
+                <button type="button" class="btn secondary-btn" id="randomBtn">Rastgele</button>
+            </div>
+        </div>
+        <div class="input-group">
+            <label id="uiNations">Ülke Sayısı (2 - 60):</label>
+            <input type="number" id="countInput" value="8" min="2" max="60">
+        </div>
+        <button type="button" class="btn primary-btn" id="startBtn">SİMÜLASYONU BAŞLAT</button>
+        <button type="button" class="btn danger-btn btnBackMenu">ANA MENÜNE DÖN</button>
+    </div>
+
+    <!-- 3. HARİTA EDİTÖRÜ -->
+    <div id="mapEditorScreen" class="screen">
+        <h2 id="uiEditorTitle">Harita Editörü</h2>
+        <div class="drop-zone" id="dropZone">
+            📷 Görsel Seç veya Buraya Sürükle-Bırak
+            <input type="file" id="imageInput" accept="image/*" style="display: none;">
+        </div>
+
+        <div class="editor-tools">
+            <div class="tool-card active" style="background: #1d4ed8;" data-type="water" title="Mavi: Su/Deniz">🌊</div>
+            <div class="tool-card" style="background: #15803d;" data-type="land" title="Yeşil: Düz Kara">🌱</div>
+            <div class="tool-card" style="background: #b45309;" data-type="mountain" title="Kahverengi: Dağ">⛰️</div>
+            <input type="range" id="brushSize" min="1" max="15" value="4" style="width: 80px;" title="Fırça Boyutu">
+        </div>
+
+        <div class="editor-container">
+            <canvas id="editorCanvas" width="150" height="150"></canvas>
+        </div>
+
+        <div class="input-group">
+            <label id="uiEditorNations">Ülke Sayısı (2 - 60):</label>
+            <input type="number" id="customCountInput" value="8" min="2" max="60">
+        </div>
+
+        <button type="button" class="btn primary-btn" id="btnPlayCustomMap">BU HARİTA İLE OYNA</button>
+        <button type="button" class="btn danger-btn btnBackMenu">ANA MENÜNE DÖN</button>
+    </div>
+
+    <!-- 4. OYUN SİMÜLASYON EKRANI -->
+    <div id="gameScreen">
+        <div class="top-bar">
+            <button id="clearBtn" class="speed-btn">ANA MENÜ</button>
+            <div id="speedBar">
+                <button class="speed-btn" data-speed="0" id="uiPause">Pause</button>
+                <button class="speed-btn" data-speed="1">1x</button>
+                <button class="speed-btn" data-speed="2">2x</button>
+                <button class="speed-btn" data-speed="3">3x</button>
+                <button class="speed-btn active" data-speed="5">5x</button>
+            </div>
+        </div>
+        
+        <div class="canvas-container">
+            <canvas id="pixelCanvas" width="150" height="150"></canvas>
+            <div id="nameOverlay"></div>
+        </div>
+    </div>
+
+    <script>
+        const gridSize = 150;
+        const totalPixels = gridSize * gridSize;
+
+        /* Dil Seçenekleri ve Çeviriler */
+        const translations = {
+            "tr": {
+                title: "Pixel Grand Strategy",
+                startRand: "BAŞLA (RASTGELE HARİTA)",
+                goEditor: "HARİTA OLUŞTUR / YÜKLE",
+                randSim: "Rastgele Simülasyon",
+                seed: "Seed:",
+                random: "Rastgele",
+                nations: "Ülke Sayısı (2 - 60):",
+                startSim: "SİMÜLASYONU BAŞLAT",
+                backMenu: "ANA MENÜNE DÖN",
+                editorTitle: "Harita Editörü",
+                dropImg: "📷 Görsel Seç veya Buraya Sürükle-Bırak",
+                playCustom: "BU HARİTA İLE OYNA",
+                mainMenu: "ANA MENÜ",
+                pause: "Durdur"
+            },
+            "en-UK": {
+                title: "Pixel Grand Strategy",
+                startRand: "START (RANDOM MAP)",
+                goEditor: "CREATE / LOAD MAP",
+                randSim: "Random Simulation",
+                seed: "Seed:",
+                random: "Random",
+                nations: "Number of Nations (2 - 60):",
+                startSim: "START SIMULATION",
+                backMenu: "BACK TO MAIN MENU",
+                editorTitle: "Map Editor",
+                dropImg: "📷 Choose Image or Drag & Drop Here",
+                playCustom: "PLAY WITH THIS MAP",
+                mainMenu: "MAIN MENU",
+                pause: "Pause"
+            },
+            "en-US": {
+                title: "Pixel Grand Strategy",
+                startRand: "START (RANDOM MAP)",
+                goEditor: "CREATE / LOAD MAP",
+                randSim: "Random Simulation",
+                seed: "Seed:",
+                random: "Random",
+                nations: "Number of Nations (2 - 60):",
+                startSim: "START SIMULATION",
+                backMenu: "BACK TO MAIN MENU",
+                editorTitle: "Map Editor",
+                dropImg: "📷 Choose Image or Drag & Drop Here",
+                playCustom: "PLAY WITH THIS MAP",
+                mainMenu: "MAIN MENU",
+                pause: "Pause"
+            },
+            "es": {
+                title: "Gran Estrategia Píxel",
+                startRand: "INICIAR (MAPA ALEATORIO)",
+                goEditor: "CREAR / Cargar MAPA",
+                randSim: "Simulación Aleatoria",
+                seed: "Semilla:",
+                random: "Aleatorio",
+                nations: "Número de Naciones (2 - 60):",
+                startSim: "INICIAR SIMULACIÓN",
+                backMenu: "VOLVER AL MENÚ",
+                editorTitle: "Editor de Mapas",
+                dropImg: "📷 Elige imagen o arrastra aquí",
+                playCustom: "JUGAR ESTE MAPA",
+                mainMenu: "MENÚ PRINCIPAL",
+                pause: "Pausa"
+            },
+            "fr": {
+                title: "Pixel Grand Strategy",
+                startRand: "JOUER (CARTE ALÉATOIRE)",
+                goEditor: "CRÉER / CHARGER CARTE",
+                randSim: "Simulation Aléatoire",
+                seed: "Graine:",
+                random: "Aléatoire",
+                nations: "Nombre de Nations (2 - 60):",
+                startSim: "LANCER SIMULATION",
+                backMenu: "RETOURNER AU MENU",
+                editorTitle: "Éditeur de Carte",
+                dropImg: "📷 Choisir une image ou Glisser-Déposer",
+                playCustom: "JOUER CETTE CARTE",
+                mainMenu: "MENU PRINCIPAL",
+                pause: "Pause"
+            },
+            "de": {
+                title: "Pixel Grand Strategy",
+                startRand: "START (ZUFALLSKARTE)",
+                goEditor: "KARTE ERSTELLEN / LADEN",
+                randSim: "Zufallssimulation",
+                seed: "Seed:",
+                random: "Zufall",
+                nations: "Anzahl der Nationen (2 - 60):",
+                startSim: "SIMULATION STARTEN",
+                backMenu: "ZURÜCK ZUM HAUPTMENÜ",
+                editorTitle: "Karten-Editor",
+                dropImg: "📷 Bild auswählen oder hierher ziehen",
+                playCustom: "DIESE KARTE SPIELEN",
+                mainMenu: "HAUPTMENÜ",
+                pause: "Pause"
+            },
+            "ru": {
+                title: "Пиксельная Гранд Стратегия",
+                startRand: "НАЧАТЬ (СЛУЧАЙНАЯ КАРТА)",
+                goEditor: "СОЗДАТЬ / ЗАГРУЗИТЬ КАРТУ",
+                randSim: "Случайная Симуляция",
+                seed: "Сид:",
+                random: "Случайно",
+                nations: "Количество Наций (2 - 60):",
+                startSim: "ЗАПУСТИТЬ СИМУЛЯЦИЮ",
+                backMenu: "В ГЛАВНОЕ МЕНЮ",
+                editorTitle: "Редактор Карт",
+                dropImg: "📷 Выберите фото или Перетащите сюда",
+                playCustom: "ИГРАТЬ НА ЭТОЙ КАРТЕ",
+                mainMenu: "ГЛАВНОЕ МЕНЮ",
+                pause: "Пауза"
+            }
+        };
+
+        function updateLanguage(lang) {
+            const t = translations[lang] || translations["tr"];
+            document.getElementById("uiTitle").innerText = t.title;
+            document.getElementById("btnGoSetup").innerText = t.startRand;
+            document.getElementById("btnGoEditor").innerText = t.goEditor;
+            document.getElementById("uiRandomTitle").innerText = t.randSim;
+            document.getElementById("uiSeed").innerText = t.seed;
+            document.getElementById("randomBtn").innerText = t.random;
+            document.getElementById("uiNations").innerText = t.nations;
+            document.getElementById("startBtn").innerText = t.startSim;
+            document.querySelectorAll(".btnBackMenu").forEach(b => b.innerText = t.backMenu);
+            document.getElementById("uiEditorTitle").innerText = t.editorTitle;
+            document.getElementById("dropZone").childNodes[0].nodeValue = t.dropImg + " ";
+            document.getElementById("uiEditorNations").innerText = t.nations;
+            document.getElementById("btnPlayCustomMap").innerText = t.playCustom;
+            document.getElementById("clearBtn").innerText = t.mainMenu;
+            document.getElementById("uiPause").innerText = t.pause;
+        }
+
+        document.getElementById('langSelect').addEventListener('change', (e) => {
+            updateLanguage(e.target.value);
+        });
+
+        function showScreen(screenId) {
+            document.querySelectorAll('#mainMenuScreen, #setupScreen, #mapEditorScreen, #gameScreen').forEach(s => s.style.display = 'none');
+            document.getElementById(screenId).style.display = 'flex';
+        }
+
+        document.getElementById('btnGoSetup').addEventListener('click', () => showScreen('setupScreen'));
+        document.getElementById('btnGoEditor').addEventListener('click', () => {
+            showScreen('mapEditorScreen');
+            initEditor();
+        });
+        document.querySelectorAll('.btnBackMenu').forEach(b => b.addEventListener('click', () => showScreen('mainMenuScreen')));
+        document.getElementById('clearBtn').addEventListener('click', () => location.reload());
+
+        /* -------------------------------------------------------------
+           HARİTA EDİTÖRÜ
+        ------------------------------------------------------------- */
+        const editorCanvas = document.getElementById('editorCanvas');
+        const editorCtx = editorCanvas.getContext('2d');
+        let customMapData = new Uint8Array(totalPixels); 
+        let currentTool = 'land'; 
+        let isDrawing = false;
+        let brushRadius = 4;
+
+        document.getElementById('brushSize').addEventListener('input', (e) => brushRadius = parseInt(e.target.value));
+
+        document.querySelectorAll('.tool-card').forEach(card => {
+            card.addEventListener('click', () => {
+                document.querySelectorAll('.tool-card').forEach(c => c.classList.remove('active'));
+                card.classList.add('active');
+                currentTool = card.dataset.type;
+            });
+        });
+
+        function initEditor() {
+            customMapData.fill(0);
+            for(let y=30; y<120; y++) {
+                for(let x=30; x<120; x++) {
+                    customMapData[y * gridSize + x] = 1;
+                }
+            }
+            drawEditor();
+        }
+
+        function drawEditor() {
+            let img = editorCtx.createImageData(gridSize, gridSize);
+            for(let i=0; i<totalPixels; i++) {
+                let pos = i * 4;
+                let type = customMapData[i];
+                if(type === 0) {
+                    img.data[pos] = 29; img.data[pos+1] = 78; img.data[pos+2] = 216;
+                } else if(type === 1) {
+                    img.data[pos] = 21; img.data[pos+1] = 128; img.data[pos+2] = 61;
+                } else {
+                    img.data[pos] = 180; img.data[pos+1] = 83; img.data[pos+2] = 9;
+                }
+                img.data[pos+3] = 255;
+            }
+            editorCtx.putImageData(img, 0, 0);
+        }
+
+        function paintAt(e) {
+            let rect = editorCanvas.getBoundingClientRect();
+            let x = Math.floor((e.clientX - rect.left) / rect.width * gridSize);
+            let y = Math.floor((e.clientY - rect.top) / rect.height * gridSize);
+            let val = currentTool === 'water' ? 0 : (currentTool === 'land' ? 1 : 2);
+
+            for(let dy = -brushRadius; dy <= brushRadius; dy++) {
+                for(let dx = -brushRadius; dx <= brushRadius; dx++) {
+                    if(dx*dx + dy*dy <= brushRadius*brushRadius) {
+                        let nx = x + dx, ny = y + dy;
+                        if(nx>=0 && nx<gridSize && ny>=0 && ny<gridSize) {
+                            customMapData[ny * gridSize + nx] = val;
+                        }
+                    }
+                }
+            }
+            drawEditor();
+        }
+
+        editorCanvas.addEventListener('mousedown', (e) => { isDrawing = true; paintAt(e); });
+        editorCanvas.addEventListener('mousemove', (e) => { if(isDrawing) paintAt(e); });
+        window.addEventListener('mouseup', () => isDrawing = false);
+
+        const dropZone = document.getElementById('dropZone');
+        const imageInput = document.getElementById('imageInput');
+
+        dropZone.addEventListener('click', () => imageInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('hover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('hover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('hover');
+            if(e.dataTransfer.files.length) handleImage(e.dataTransfer.files[0]);
+        });
+        imageInput.addEventListener('change', (e) => { if(e.target.files.length) handleImage(e.target.files[0]); });
+
+        function handleImage(file) {
+            let reader = new FileReader();
+            reader.onload = (event) => {
+                let img = new Image();
+                img.onload = () => {
+                    let tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = gridSize;
+                    tempCanvas.height = gridSize;
+                    let tempCtx = tempCanvas.getContext('2d');
+                    tempCtx.drawImage(img, 0, 0, gridSize, gridSize);
+                    let imgData = tempCtx.getImageData(0, 0, gridSize, gridSize).data;
+
+                    for(let i=0; i<totalPixels; i++) {
+                        let r = imgData[i*4];
+                        let g = imgData[i*4+1];
+                        let b = imgData[i*4+2];
+
+                        if(b > r && b > g && b > 80) {
+                            customMapData[i] = 0;
+                        } else if(r > 120 && g > 80 && b < 100) {
+                            customMapData[i] = 2;
+                        } else if(r < 50 && g < 50 && b < 50) {
+                            customMapData[i] = 0;
+                        } else {
+                            customMapData[i] = 1;
+                        }
+                    }
+                    drawEditor();
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        /* -------------------------------------------------------------
+           SİMÜLASYON, HEDEF DÜŞMAN DONANMALARI & ADALARI KEŞİF FİLOSU
+        ------------------------------------------------------------- */
+        const canvas = document.getElementById('pixelCanvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const nameOverlay = document.getElementById('nameOverlay');
+        const imgData = ctx.createImageData(gridSize, gridSize);
+
+        const MAX_COUNTRIES = 60;
+        let grid = new Int32Array(totalPixels).fill(-1);
+        let nextGrid = new Int32Array(totalPixels).fill(-1);
+        let conqueredFrom = new Int32Array(totalPixels).fill(-1);
+        let nextConqueredFrom = new Int32Array(totalPixels).fill(-1);
+        let mapTerrain = new Uint8Array(totalPixels); 
+
+        let connectedMap = new Uint8Array(totalPixels);
+        let queue = new Int32Array(totalPixels);
+
+        let countries = [];
+        let navies = []; 
+        let currentMultiplier = 5;
+        let warMatrix = new Uint8Array(MAX_COUNTRIES * MAX_COUNTRIES).fill(0); 
+        let diplomacyCounter = 0;
+
+        const dx = [0, 0, -1, 1];
+        const dy = [-1, 1, 0, 0];
+
+        const baseNames = ["Aethel", "Vectis", "Solaris", "Hyperion", "Valoria", "Nexus", "Ironreach", "Zephyr", "Chronos", "Frosthold", "Novgorod", "Verdantia", "Karthum", "Oasis", "Aegis", "Zenith", "Nova", "Terra", "Sol", "Astra", "Borealis", "Crimson", "Shadow", "Apex", "Eldoria", "Gondwana", "Avalon", "Sylvaria", "Ignis", "Umbra", "Helios", "Lunaris", "Draconis", "Tarkov", "Kyoto", "Sparta", "Troy", "Atlantis", "Babylon", "Camelot", "Asgard", "Midgard", "Nirvana", "Valhalla"];
+
+        function seededRandom(seed) {
+            let x = Math.sin(seed++) * 10000;
+            return x - Math.floor(x);
+        }
+
+        document.getElementById('randomBtn').addEventListener('click', () => {
+            document.getElementById('seedInput').value = Math.floor(Math.random() * 1000000);
+        });
+
+        document.getElementById('startBtn').addEventListener('click', () => {
+            const count = Math.min(Math.max(parseInt(document.getElementById('countInput').value) || 8, 2), MAX_COUNTRIES);
+            const seed = document.getElementById('seedInput').value;
+            const seedVal = isNaN(seed) ? seed.split('').reduce((a,b)=>a+b.charCodeAt(0),0) : parseInt(seed);
+            
+            showScreen('gameScreen');
+            initializeRandom(count, seedVal);
+            requestAnimationFrame(loop);
+        });
+
+        document.getElementById('btnPlayCustomMap').addEventListener('click', () => {
+            const count = Math.min(Math.max(parseInt(document.getElementById('customCountInput').value) || 8, 2), MAX_COUNTRIES);
+            
+            showScreen('gameScreen');
+            initializeCustom(count);
+            requestAnimationFrame(loop);
+        });
+
+        document.querySelectorAll('.speed-btn[data-speed]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                currentMultiplier = parseInt(e.target.dataset.speed);
+            });
+        });
+
+        function initializeRandom(count, seed) {
+            for(let y=0; y<gridSize; y++) {
+                for(let x=0; x<gridSize; x++) {
+                    let idx = y * gridSize + x;
+                    let dist = Math.hypot(x - 75, y - 75);
+                    if(dist > 65 || seededRandom(seed + idx) < 0.22) {
+                        mapTerrain[idx] = 0; // Deniz
+                    } else {
+                        mapTerrain[idx] = 1; // Kara
+                    }
+                }
+            }
+            setupCountries(count, seed);
+        }
+
+        function initializeCustom(count) {
+            mapTerrain.set(customMapData);
+            setupCountries(count, Math.floor(Math.random()*100000));
+        }
+
+        function setupCountries(count, seed) {
+            countries = [];
+            navies = [];
+            warMatrix.fill(0);
+            grid.fill(-1);
+            conqueredFrom.fill(-1);
+
+            let usedNames = new Set();
+            for(let i=0; i<count; i++) {
+                let nIdx = Math.floor(seededRandom(seed + i * 17) * baseNames.length);
+                let bName = baseNames[nIdx];
+                if(usedNames.has(bName)) bName += ` ${i}`;
+                usedNames.add(bName);
+
+                let r = Math.floor(seededRandom(seed + i * 31) * 180 + 50);
+                let g = Math.floor(seededRandom(seed + i * 37) * 180 + 50);
+                let b = Math.floor(seededRandom(seed + i * 41) * 180 + 50);
+
+                countries.push({
+                    id: i, baseName: bName, isFree: false, color: [r, g, b],
+                    conquerColor: [Math.min(255, r + 30), Math.min(255, g + 30), Math.min(255, b + 30)],
+                    power: Math.floor(seededRandom(seed + i * 47) * 4) + 3,
+                    capitalX: 0, capitalY: 0, alive: true
+                });
+            }
+
+            for(let i=0; i<count; i++) {
+                let placed = false;
+                for(let attempts=0; attempts<500; attempts++) {
+                    let x = Math.floor(seededRandom(seed + i * 101 + attempts) * (gridSize - 20) + 10);
+                    let y = Math.floor(seededRandom(seed + i * 107 + attempts) * (gridSize - 20) + 10);
+                    let idx = y * gridSize + x;
+                    
+                    if(mapTerrain[idx] !== 0 && grid[idx] === -1) {
+                        countries[i].capitalX = x;
+                        countries[i].capitalY = y;
+                        grid[idx] = i;
+                        placed = true;
+                        break;
+                    }
+                }
+                if(!placed) countries[i].alive = false;
+            }
+        }
+
+        function loop() {
+            if(currentMultiplier > 0) {
+                for(let i=0; i<currentMultiplier; i++) step();
+            }
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        function getLinePixels(x0, y0, x1, y1) {
+            let pts = [];
+            let dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+            let sx = (x0 < x1) ? 1 : -1;
+            let sy = (y0 < y1) ? 1 : -1;
+            let err = dx - dy;
+            while (true) {
+                pts.push({x: x0, y: y0});
+                if (x0 === x1 && y0 === y1) break;
+                let e2 = 2 * err;
+                if (e2 > -dy) { err -= dy; x0 += sx; }
+                if (e2 < dx) { err += dx; y0 += sy; }
+            }
+            return pts;
+        }
+
+        function step() {
+            diplomacyCounter++;
+            if (diplomacyCounter >= 40) {
+                diplomacyCounter = 0;
+                updateDiplomacy();
+            }
+
+            for (let i = 0; i < countries.length; i++) {
+                let c = countries[i];
+                if (!c.alive) continue;
+                let capIdx = c.capitalY * gridSize + c.capitalX;
+                if (grid[capIdx] !== i) {
+                    c.alive = false;
+                    for (let p = 0; p < totalPixels; p++) {
+                        if (grid[p] === i) {
+                            grid[p] = -1;
+                            conqueredFrom[p] = -1;
+                        }
+                    }
+                }
+            }
+
+            connectedMap.fill(0);
+            for (let i = 0; i < countries.length; i++) {
+                let c = countries[i];
+                if (!c.alive) continue;
+                let capIdx = c.capitalY * gridSize + c.capitalX;
+                if (grid[capIdx] === i) {
+                    let head = 0, tail = 0;
+                    queue[tail++] = capIdx;
+                    connectedMap[capIdx] = 1;
+                    
+                    while(head < tail) {
+                        let curr = queue[head++];
+                        let cx = curr % gridSize;
+                        let cy = Math.floor(curr / gridSize);
+                        for(let d = 0; d < 4; d++) {
+                            let nx = cx + dx[d], ny = cy + dy[d];
+                            if(nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize) {
+                                let nIdx = ny * gridSize + nx;
+                                if(grid[nIdx] === i && connectedMap[nIdx] === 0) {
+                                    connectedMap[nIdx] = 1;
+                                    queue[tail++] = nIdx;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            nextGrid.set(grid);
+            nextConqueredFrom.set(conqueredFrom);
+
+            // 1. DİL, SAVAŞ VE KEŞİF DONANMA ATMA MEKANİĞİ
+            for(let i = 0; i < countries.length; i++) {
+                let c1 = countries[i];
+                if(!c1.alive || Math.random() > 0.08) continue;
+
+                // Ülkenin deniz kıyılarını bul
+                let coastalPoints = [];
+                for(let py = 0; py < gridSize; py++) {
+                    for(let px = 0; px < gridSize; px++) {
+                        let idx = py * gridSize + px;
+                        if(grid[idx] === c1.id) {
+                            for(let d = 0; d < 4; d++) {
+                                let nx = px + dx[d], ny = py + dy[d];
+                                if(nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize) {
+                                    if(mapTerrain[ny * gridSize + nx] === 0) { // Kıyı denizi
+                                        coastalPoints.push({x: nx, y: ny});
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if(coastalPoints.length === 0) continue; // Denize kıyısı yoksa donanma çıkaramaz
+
+                // A) SADECE SAVAŞTA OLUNAN ÜLKELERE SAVAŞ DONANMASI GÖNDER
+                let enemyCountries = [];
+                for(let j = 0; j < countries.length; j++) {
+                    if(i === j) continue;
+                    let c2 = countries[j];
+                    if(!c2.alive) continue;
+
+                    let p1 = Math.min(i, j), p2 = Math.max(i, j);
+                    if(warMatrix[p1 * MAX_COUNTRIES + p2] === 1) { // Sadece savaşta olunanlar!
+                        enemyCountries.push(c2);
+                    }
+                }
+
+                if(enemyCountries.length > 0 && Math.random() < 0.6) {
+                    let targetEnemy = enemyCountries[Math.floor(Math.random() * enemyCountries.length)];
+                    let spawn = coastalPoints[Math.floor(Math.random() * coastalPoints.length)];
+                    
+                    // Doğrudan düşman başkentine veya toprağına odaklan
+                    let angle = Math.atan2(targetEnemy.capitalY - spawn.y, targetEnemy.capitalX - spawn.x);
+                    navies.push({
+                        owner: c1.id,
+                        targetOwner: targetEnemy.id,
+                        type: 'war', // Savaş donanması
+                        x: spawn.x, y: spawn.y,
+                        vx: Math.cos(angle) * 0.9,
+                        vy: Math.sin(angle) * 0.9,
+                        life: 0
+                    });
+                } 
+                // B) SAHİPSİZ KETFEDİLMEMİŞ ADALARA KEŞİF FİLOSU (SCOUT FLEET) GÖNDER
+                else if(Math.random() < 0.35) {
+                    // Haritadaki sahipsiz karaları (grid === -1 & mapTerrain !== 0) bul
+                    let unclaimedLands = [];
+                    for(let py = 0; py < gridSize; py+=3) { // Performans için adımlarla tara
+                        for(let px = 0; px < gridSize; px+=3) {
+                            let idx = py * gridSize + px;
+                            if(mapTerrain[idx] === 1 && grid[idx] === -1) {
+                                unclaimedLands.push({x: px, y: py});
+                            }
+                        }
+                    }
+
+                    if(unclaimedLands.length > 0) {
+                        let targetIsland = unclaimedLands[Math.floor(Math.random() * unclaimedLands.length)];
+                        let spawn = coastalPoints[Math.floor(Math.random() * coastalPoints.length)];
+                        let angle = Math.atan2(targetIsland.y - spawn.y, targetIsland.x - spawn.x);
+                        
+                        navies.push({
+                            owner: c1.id,
+                            targetOwner: -1,
+                            type: 'scout', // Keşif filosu
+                            x: spawn.x, y: spawn.y,
+                            vx: Math.cos(angle) * 0.9,
+                            vy: Math.sin(angle) * 0.9,
+                            life: 0
+                        });
+                    }
+                }
+            }
+
+            // Donanmanın deniz üzerindeki hareketi, engelden kaçınma & fetih / kolonileştirme
+            for(let k = navies.length - 1; k >= 0; k--) {
+                let n = navies[k];
+                let nextX = n.x + n.vx;
+                let nextY = n.y + n.vy;
+                let px = Math.floor(nextX);
+                let py = Math.floor(nextY);
+
+                if(px < 0 || px >= gridSize || py < 0 || py >= gridSize || n.life > 220) {
+                    navies.splice(k, 1);
+                    continue;
+                }
+
+                let targetIdx = py * gridSize + px;
+                let tTerrain = mapTerrain[targetIdx];
+                let tOwner = grid[targetIdx];
+
+                if(tTerrain === 0) {
+                    // Denizde sorunsuz ilerle
+                    n.x = nextX;
+                    n.y = nextY;
+                    n.life++;
+                } else {
+                    // KARAYA ULAŞILDI: Karadan geçilemez!
+                    
+                    // 1. KEŞİF FİLOSU Sahipsiz bir karaya ulaştı -> Kolonileştir!
+                    if(n.type === 'scout' && tOwner === -1) {
+                        nextGrid[targetIdx] = n.owner;
+                        nextConqueredFrom[targetIdx] = -1;
+                        navies.splice(k, 1);
+                    }
+                    // 2. SAVAŞ DONANMASI Savaşta olunan düşman karasına ulaştı -> Fethet!
+                    else if(n.type === 'war' && tOwner !== -1 && tOwner !== n.owner) {
+                        let p1 = Math.min(n.owner, tOwner);
+                        let p2 = Math.max(n.owner, tOwner);
+                        if(warMatrix[p1 * MAX_COUNTRIES + p2] === 1) { // Sadece savaşta olunduğunda vurur!
+                            nextGrid[targetIdx] = n.owner;
+                            nextConqueredFrom[targetIdx] = tOwner;
+                            navies.splice(k, 1);
+                        } else {
+                            // Savaşta olunmayan ülkenin karasına gelindiğinde denizden dolaş
+                            redirectNavy(n);
+                        }
+                    } 
+                    // Kendi karası veya geçilemeyen yer -> Denizden yön değiştirip dolaş
+                    else {
+                        redirectNavy(n);
+                    }
+                }
+            }
+
+            // 2. KARA SAVAŞI
+            let strategicLineMap = new Uint8Array(totalPixels);
+            for (let i = 0; i < countries.length; i++) {
+                let c1 = countries[i];
+                if (!c1.alive) continue;
+                for (let j = i + 1; j < countries.length; j++) {
+                    let c2 = countries[j];
+                    if (!c2.alive) continue;
+                    let p1 = Math.min(i, j), p2 = Math.max(i, j);
+                    if (warMatrix[p1 * MAX_COUNTRIES + p2] === 1) {
+                        let line = getLinePixels(c1.capitalX, c1.capitalY, c2.capitalX, c2.capitalY);
+                        for (let pt of line) {
+                            for (let dy = -3; dy <= 3; dy++) {
+                                for (let dx2 = -3; dx2 <= 3; dx2++) {
+                                    let nx = pt.x + dx2, ny = pt.y + dy;
+                                    if (nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize) {
+                                        strategicLineMap[ny * gridSize + nx] = 1;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            for(let i = 0; i < totalPixels; i++) {
+                let countryId = grid[i];
+                if(countryId === -1) continue;
+                let c = countries[countryId];
+                if(!c || !c.alive) continue;
+
+                let x = i % gridSize;
+                let y = Math.floor(i / gridSize);
+                
+                let isConnected = connectedMap[i] === 1;
+                let defenseMultiplier = isConnected ? 1.0 : 0.12;
+
+                for(let d = 0; d < 4; d++) {
+                    let nx = x + dx[d], ny = y + dy[d];
+                    if(nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize) {
+                        let targetIdx = ny * gridSize + nx;
+                        if(mapTerrain[targetIdx] === 0) continue; // Karadan denize yürüme engellendi
+
+                        let targetId = grid[targetIdx];
+
+                        if(targetId === -1) {
+                            if(Math.random() < (0.08 + c.power * 0.01)) {
+                                nextGrid[targetIdx] = countryId;
+                                nextConqueredFrom[targetIdx] = -1;
+                            }
+                        } else if(targetId !== countryId) {
+                            let p1 = Math.min(countryId, targetId);
+                            let p2 = Math.max(countryId, targetId);
+                            if(warMatrix[p1 * MAX_COUNTRIES + p2] === 1) {
+                                let enemy = countries[targetId];
+                                if (!enemy.alive) continue;
+
+                                let isOnStrategicLine = strategicLineMap[targetIdx] === 1;
+                                let distToEnemyCap = Math.hypot(nx - enemy.capitalX, ny - enemy.capitalY);
+                                let distToSelfCap = Math.hypot(nx - c.capitalX, ny - c.capitalY);
+
+                                let lineBonus = isOnStrategicLine ? 2.4 : 0.3;
+                                let distancePenalty = Math.max(0.08, 1.9 - (distToEnemyCap / 50));
+                                let supplyCost = (distToSelfCap > 35) ? 0.3 : 1.0; 
+
+                                let attackChance = (0.04 + (c.power - enemy.power) * 0.008) * defenseMultiplier * lineBonus * distancePenalty * supplyCost;
+                                if(attackChance < 0.0015) attackChance = 0.0015;
+                                
+                                if(Math.random() < attackChance) {
+                                    nextGrid[targetIdx] = countryId;
+                                    nextConqueredFrom[targetIdx] = targetId; 
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            grid.set(nextGrid);
+            conqueredFrom.set(nextConqueredFrom);
+        }
+
+        // Donanmanın karaya çarptığında denizden kaçınma manevrası
+        function redirectNavy(n) {
+            let altAngles = [Math.PI/2, -Math.PI/2, Math.PI/4, -Math.PI/4];
+            let redirected = false;
+            for(let a of altAngles) {
+                let currAngle = Math.atan2(n.vy, n.vx) + a;
+                let testX = Math.floor(n.x + Math.cos(currAngle));
+                let testY = Math.floor(n.y + Math.sin(currAngle));
+                if(testX>=0 && testX<gridSize && testY>=0 && testY<gridSize) {
+                    if(mapTerrain[testY * gridSize + testX] === 0) { // Açık deniz bulundu
+                        n.vx = Math.cos(currAngle) * 0.9;
+                        n.vy = Math.sin(currAngle) * 0.9;
+                        n.x += n.vx;
+                        n.y += n.vy;
+                        redirected = true;
+                        break;
+                    }
+                }
+            }
+            if(!redirected) n.life += 50; // Sıkıştıysa hızlıca yok olur
+        }
+
+        function updateDiplomacy() {
+            let activeCountries = countries.filter(c => c.alive);
+            if (activeCountries.length < 2) return;
+
+            let c1 = activeCountries[Math.floor(Math.random() * activeCountries.length)];
+            let c2 = activeCountries[Math.floor(Math.random() * activeCountries.length)];
+            if (c1.id !== c2.id) {
+                let p1 = Math.min(c1.id, c2.id);
+                let p2 = Math.max(c1.id, c2.id);
+                let idx = p1 * MAX_COUNTRIES + p2;
+                warMatrix[idx] = Math.random() < 0.35 ? 1 : 0;
+            }
+        }
+
+        let frameCount = 0;
+        let cachedLabelsHTML = "";
+
+        function draw() {
+            const data = imgData.data;
+            let countryStats = {};
+
+            for(let i = 0; i < totalPixels; i++) {
+                let id = grid[i];
+                let pos = i * 4;
+                let terrain = mapTerrain[i];
+
+                if(id === -1) {
+                    if(terrain === 0) { // Su
+                        data[pos] = 29; data[pos+1] = 78; data[pos+2] = 216;
+                    } else if(terrain === 2) { // Dağ
+                        data[pos] = 180; data[pos+1] = 83; data[pos+2] = 9;
+                    } else { // Boş / Keşfedilmemiş Kara
+                        data[pos] = 220; data[pos+1] = 220; data[pos+2] = 220;
+                    }
+                    conqueredFrom[i] = -1;
+                } else {
+                    let c = countries[id];
+                    let rgb = c ? c.color : [200, 200, 200];
+                    let x = i % gridSize;
+                    let y = Math.floor(i / gridSize);
+                    
+                    let prevOwner = conqueredFrom[i];
+                    let isConquered = false;
+
+                    if (prevOwner !== -1) {
+                        let enemyC = countries[prevOwner];
+                        if (enemyC && enemyC.alive) {
+                            let p1 = Math.min(id, prevOwner);
+                            let p2 = Math.max(id, prevOwner);
+                            if (warMatrix[p1 * MAX_COUNTRIES + p2] === 1) {
+                                isConquered = true;
+                            } else {
+                                conqueredFrom[i] = -1; 
+                            }
+                        } else {
+                            conqueredFrom[i] = -1;
+                        }
+                    }
+
+                    if (isConquered) {
+                        rgb = c.conquerColor; 
+                    } else {
+                        let isBorder = false;
+                        let borderTargetId = -1;
+                        
+                        for(let d = 0; d < 4; d++) {
+                            let nx = x + dx[d], ny = y + dy[d];
+                            if(nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize) {
+                                let nId = grid[ny * gridSize + nx];
+                                if(nId !== id && nId !== -1) {
+                                    isBorder = true;
+                                    borderTargetId = nId;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if(isBorder && borderTargetId !== -1) {
+                            let p1 = Math.min(id, borderTargetId);
+                            let p2 = Math.max(id, borderTargetId);
+                            if (warMatrix[p1 * MAX_COUNTRIES + p2] === 1) {
+                                rgb = [255, 255, 255]; 
+                            } else {
+                                rgb = [0, 0, 0]; 
+                            }
+                        }
+                    }
+
+                    data[pos] = rgb[0]; data[pos+1] = rgb[1]; data[pos+2] = rgb[2];
+
+                    if(c && c.alive) {
+                        if(!countryStats[id]) countryStats[id] = { sumX: 0, sumY: 0, count: 0 };
+                        countryStats[id].sumX += x; countryStats[id].sumY += y; countryStats[id].count++;
+                    }
+                }
+                data[pos+3] = 255;
+            }
+
+            // Donanma toplarını / keşif gemilerini deniz üzerinde kendi ülke renginde çiz
+            for(let n of navies) {
+                let px = Math.floor(n.x);
+                let py = Math.floor(n.y);
+                if(px >= 0 && px < gridSize && py >= 0 && py < gridSize) {
+                    let idx = (py * gridSize + px) * 4;
+                    let ownerC = countries[n.owner];
+                    if(ownerC) {
+                        if(n.type === 'scout') {
+                            // Keşif gemisi parlayan sarı/beyazımsı çekirdekle çizilir
+                            data[idx] = 255; data[idx+1] = 230; data[idx+2] = 100;
+                        } else {
+                            // Savaş donanması kendi renginde çizilir
+                            data[idx] = ownerC.color[0];
+                            data[idx+1] = ownerC.color[1];
+                            data[idx+2] = ownerC.color[2];
+                        }
+                    }
+                }
+            }
+
+            // Başkentleri Çiz
+            for(let i=0; i<countries.length; i++) {
+                let c = countries[i];
+                if(c.alive) {
+                    let cx = c.capitalX, cy = c.capitalY;
+                    let capIdx = (cy * gridSize + cx) * 4;
+                    data[capIdx] = 0; data[capIdx+1] = 0; data[capIdx+2] = 0;
+                }
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+
+            frameCount++;
+            if (frameCount % 15 === 0) {
+                cachedLabelsHTML = '';
+                for(let id in countryStats) {
+                    let s = countryStats[id];
+                    let c = countries[id];
+                    if(s.count > 10 && c) {
+                        let cx = (s.sumX / s.count / gridSize) * 100;
+                        let cy = (s.sumY / s.count / gridSize) * 100;
+                        let fontSize = s.count < 50 ? '9px' : (s.count < 200 ? '11px' : '14px');
+                        cachedLabelsHTML += `<div class="country-label" style="left: ${cx}%; top: ${cy}%; font-size: ${fontSize};">${c.baseName}</div>`;
+                    }
+                }
+                nameOverlay.innerHTML = cachedLabelsHTML;
+            }
+        }
+    </script>
+</body>
+</html>
