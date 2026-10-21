@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGame PPTX Sunum Aracı</title>
+    <!-- JSZip kütüphanesi - PPTX dosyalarını tarayıcıda okumak için -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- Lucide Icon Seti -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-color: #38bdf8;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* Yükleme Ekranı / Sürükle Bırak Alanı */
+        #upload-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .drop-zone {
+            width: 100%;
+            border: 2px dashed #334155;
+            border-radius: 1.5rem;
+            padding: 3.5rem 2rem;
+            text-align: center;
+            background-color: var(--card-bg);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.25rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: var(--accent-color);
+            background-color: #273549;
+            transform: translateY(-2px);
+        }
+
+        .icon-box {
+            width: 64px;
+            height: 64px;
+            background: rgba(56, 189, 248, 0.1);
+            border-radius: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent-color);
+        }
+
+        .drop-zone h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .drop-zone p {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        /* Sunum Ekranı */
+        #presentation-view {
+            display: none;
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            background-color: #000000;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Slayt İçerik Alanı */
+        .slide-stage {
+            width: 85vw;
+            height: 75vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 3rem;
+            text-align: center;
+            overflow-y: auto;
+            color: #ffffff;
+            scrollbar-width: thin;
+            scrollbar-color: #334155 transparent;
+        }
+
+        .slide-text-block {
+            font-size: clamp(1.5rem, 3.5vw, 3rem);
+            font-weight: 500;
+            line-height: 1.4;
+            max-width: 1100px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            animation: fadeIn 0.25s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Alt Kontrol Paneli (Glassmorphism Stilinde) */
+        .control-bar {
+            position: absolute;
+            bottom: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 0.6rem 1.25rem;
+            border-radius: 9999px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+            min-width: 280px;
+            gap: 1.5rem;
+            z-index: 50;
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.15);
+            color: var(--accent-color);
+            transform: scale(1.08);
+        }
+
+        .nav-btn:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.25;
+            cursor: not-allowed;
+            color: var(--text-muted);
+        }
+
+        /* Sayfa Sayacı */
+        .slide-counter {
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            color: var(--text-main);
+            min-width: 70px;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Çıkış Butonu */
+        .close-btn {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-muted);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            z-index: 50;
+        }
+
+        .close-btn:hover {
+            color: var(--text-main);
+            background: rgba(239, 68, 68, 0.8);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Yükleme Ekranı -->
+    <div id="upload-container">
+        <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+            <div class="icon-box">
+                <i data-lucide="file-up" style="width: 32px; height: 32px;"></i>
+            </div>
+            <div>
+                <h2>PPTX Dosyası Yükleyin</h2>
+                <p style="margin-top: 4px;">Sürükleyip bırakın veya seçmek için tıklayın</p>
+            </div>
+            <input type="file" id="file-input" accept=".pptx" style="display: none;">
+        </div>
+    </div>
+
+    <!-- Sunum Ekranı -->
+    <div id="presentation-view">
+        <!-- ESC ile çıkış düğmesi -->
+        <button class="close-btn" id="close-btn" title="Sunumdan Çık (ESC)">
+            <i data-lucide="x" style="width: 20px; height: 20px;"></i>
+        </button>
+
+        <!-- Slayt Metin İçeriği -->
+        <div class="slide-stage">
+            <div id="slide-content" class="slide-text-block"></div>
+        </div>
+
+        <!-- Alt Kontrol Paneli -->
+        <div class="control-bar">
+            <!-- Sol Ok (Önceki Slayt) -->
+            <button class="nav-btn" id="prev-btn" title="Önceki Slayt (Sol Ok)">
+                <i data-lucide="arrow-left" style="width: 24px; height: 24px;"></i>
+            </button>
+
+            <!-- Slayt Numarası (Ortada) -->
+            <div class="slide-counter" id="slide-counter">0 / 0</div>
+
+            <!-- Sağ Ok (Sonraki Slayt) -->
+            <button class="nav-btn" id="next-btn" title="Sonraki Slayt (Sağ Ok veya Boşluk)">
+                <i data-lucide="arrow-right" style="width: 24px; height: 24px;"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let slidesData = [];
+        let currentSlideIndex = 0;
+
+        // DOM Elemanları
+        const uploadContainer = document.getElementById('upload-container');
+        const presentationView = document.getElementById('presentation-view');
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const slideContent = document.getElementById('slide-content');
+        const slideCounter = document.getElementById('slide-counter');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const closeBtn = document.getElementById('close-btn');
+
+        // İkonları Başlat
+        lucide.createIcons();
+
+        // Dosya Seçim & Sürükle Bırak Dinleyicileri
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) processFile(e.target.files[0]);
+        });
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            if (e.dataTransfer.files.length > 0) processFile(e.dataTransfer.files[0]);
+        });
+
+        // PPTX Ayıklama Mantığı
+        async function processFile(file) {
+            if (!file.name.endsWith('.pptx')) {
+                alert('Lütfen geçerli bir .pptx dosyası yükleyin.');
+                return;
+            }
+
+            try {
+                const zip = new JSZip();
+                const zipContent = await zip.loadAsync(file);
+                slidesData = [];
+
+                // PPTX içindeki slayt dosyalarını filtrele
+                let slideFiles = Object.keys(zipContent.files).filter(name => 
+                    name.match(/^ppt\/slides\/slide\d+\.xml$/)
+                );
+
+                // Slaytları doğru sıraya diz (slide1.xml, slide2.xml ...)
+                slideFiles.sort((a, b) => {
+                    let numA = parseInt(a.match(/slide(\d+)\.xml/)[1]);
+                    let numB = parseInt(b.match(/slide(\d+)\.xml/)[1]);
+                    return numA - numB;
+                });
+
+                if (slideFiles.length === 0) {
+                    alert('PPTX dosyası içinde slayt bulunamadı.');
+                    return;
+                }
+
+                // Slayt içeriklerini XML parse ederek al
+                for (let slidePath of slideFiles) {
+                    let xmlText = await zipContent.files[slidePath].async("text");
+                    let parser = new DOMParser();
+                    let xmlDoc = parser.parseFromString(xmlText, "text/xml");
+                    let textElements = xmlDoc.getElementsByTagName("a:t");
+                    
+                    let paragraphTexts = [];
+                    for (let el of textElements) {
+                        if (el.textContent.trim().length > 0) {
+                            paragraphTexts.push(el.textContent);
+                        }
+                    }
+
+                    slidesData.push(paragraphTexts.join('\n') || `(Slayt ${slidesData.length + 1})`);
+                }
+
+                // Sunum Ekranına Geçiş
+                startPresentation();
+
+            } catch (err) {
+                alert('Dosya okunurken bir hata oluştu: ' + err.message);
+            }
+        }
+
+        // Sunumu Başlat
+        function startPresentation() {
+            uploadContainer.style.display = 'none';
+            presentationView.style.display = 'flex';
+            currentSlideIndex = 0;
+
+            // Tam ekrana geçmeyi dene
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            }
+
+            renderSlide();
+        }
+
+        // Slaytı ve Alt Kontrol Panelini Güncelle
+        function renderSlide() {
+            if (slidesData.length === 0) return;
+
+            // İçeriği Yazdır
+            slideContent.textContent = slidesData[currentSlideIndex];
+
+            // Sayacı Güncelle (Örn: 1 / 10)
+            slideCounter.textContent = `${currentSlideIndex + 1} / ${slidesData.length}`;
+
+            // Buton Pasiflik / Aktiflik Kontrolleri
+            prevBtn.disabled = (currentSlideIndex === 0); // İlk slayttaysa sol ok pasif
+            nextBtn.disabled = (currentSlideIndex === slidesData.length - 1); // Son slayttaysa sağ ok pasif
+        }
+
+        // Gezinme Fonksiyonları
+        function nextSlide() {
+            if (currentSlideIndex < slidesData.length - 1) {
+                currentSlideIndex++;
+                renderSlide();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlideIndex > 0) {
+                currentSlideIndex--;
+                renderSlide();
+            }
+        }
+
+        function exitPresentation() {
+            presentationView.style.display = 'none';
+            uploadContainer.style.display = 'flex';
+            fileInput.value = '';
+
+            if (document.fullscreenElement && document.exitFullscreen) {
+                document.exitFullscreen().catch(() => {});
+            }
+        }
+
+        // Event Dinleyicileri
+        nextBtn.addEventListener('click', nextSlide);
+        prevBtn.addEventListener('click', prevSlide);
+        closeBtn.addEventListener('click', exitPresentation);
+
+        // Klavye Kontrolleri
+        document.addEventListener('keydown', (e) => {
+            if (presentationView.style.display === 'flex') {
+                if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+                    e.preventDefault();
+                    nextSlide();
+                } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+                    e.preventDefault();
+                    prevSlide();
+                } else if (e.key === 'Escape') {
+                    exitPresentation();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
