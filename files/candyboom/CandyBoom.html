@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <title>Candy Boom - Pro</title>
     <style>
         * {
@@ -14,27 +14,31 @@
             padding: 0;
         }
 
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
         body {
             background: radial-gradient(circle at 50% 30%, #3a0d5c, #150326, #090112);
             font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             color: #ffffff;
-            height: 100vh;
-            width: 100vw;
             display: flex;
             align-items: center;
             justify-content: center;
-            overflow: hidden;
         }
 
-        /* Responsive Oyun Alanı */
+        /* Responsive Ekrana Tam Oturan Oyun Alanı */
         .game-wrapper {
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            width: 100%;
-            height: 100%;
-            padding: 12px;
+            width: 100vw;
+            height: 100vh;
+            padding: min(16px, 2vh);
+            gap: min(12px, 1.5vh);
         }
 
         /* Üst Skor ve Süre Barı */
@@ -42,19 +46,20 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            width: min(92vw, 62vh);
-            margin-bottom: 14px;
+            width: min(92vw, 55vh);
+            max-width: 500px;
             background: rgba(255, 255, 255, 0.07);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
-            padding: 12px 20px;
+            padding: min(10px, 1.2vh) min(16px, 2vw);
             border-radius: 20px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255,255,255,0.2);
             border: 1px solid rgba(255, 255, 255, 0.15);
+            flex-shrink: 0;
         }
 
         .title {
-            font-size: clamp(1.3rem, 3.5vw, 2rem);
+            font-size: clamp(1.1rem, 3.5vw, 1.8rem);
             font-weight: 900;
             letter-spacing: 1px;
             background: linear-gradient(45deg, #ff007f, #b5179e, #00dfd8);
@@ -65,7 +70,7 @@
 
         .stats {
             display: flex;
-            gap: 18px;
+            gap: min(16px, 2vw);
         }
 
         .stat-box {
@@ -83,32 +88,35 @@
         }
 
         .stat-value {
-            font-size: clamp(1.1rem, 2.8vw, 1.4rem);
+            font-size: clamp(1rem, 2.8vw, 1.3rem);
             font-weight: 800;
             color: #ffd700;
             text-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
         }
 
-        /* 8x8 Detaylandırılmış Oyun Tahtası */
+        /* 8x8 Detaylandırılmış Ekrana Sığan Oyun Tahtası */
         .board-container {
-            width: min(92vw, 62vh);
-            height: min(92vw, 62vh);
+            width: min(92vw, 55vh);
+            height: min(92vw, 55vh);
+            max-width: 500px;
+            max-height: 500px;
             background: rgba(15, 5, 29, 0.7);
             backdrop-filter: blur(12px);
             border-radius: 24px;
-            padding: 10px;
+            padding: min(8px, 1vh);
             box-shadow: 
                 inset 0 0 25px rgba(0, 0, 0, 0.9), 
                 0 15px 35px rgba(0, 0, 0, 0.6),
                 0 0 0 2px rgba(255, 255, 255, 0.1);
             position: relative;
+            flex-shrink: 0;
         }
 
         .board {
             display: grid;
             grid-template-columns: repeat(8, 1fr);
             grid-template-rows: repeat(8, 1fr);
-            gap: 6px;
+            gap: 4px;
             width: 100%;
             height: 100%;
         }
@@ -116,11 +124,11 @@
         /* 3D Görünümlü Detaylı Şeker Kutusu */
         .cell {
             background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03));
-            border-radius: 14px;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: calc(min(92vw, 62vh) / 11);
+            font-size: clamp(1.2rem, calc(min(92vw, 55vh) / 11), 2.2rem);
             cursor: pointer;
             transition: transform 0.12s ease, background 0.15s ease, box-shadow 0.15s ease;
             position: relative;
@@ -129,6 +137,7 @@
                 inset 0 1px 1px rgba(255, 255, 255, 0.25),
                 inset 0 -2px 4px rgba(0, 0, 0, 0.4);
             border: 1px solid rgba(255, 255, 255, 0.08);
+            aspect-ratio: 1 / 1;
         }
 
         .cell:active {
@@ -177,6 +186,7 @@
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.3s ease;
+            padding: 16px;
         }
 
         .modal-overlay.active {
@@ -186,17 +196,19 @@
 
         .modal-card {
             background: linear-gradient(145deg, #250a40, #120324);
-            padding: 32px 28px;
+            padding: min(28px, 4vh) min(24px, 4vw);
             border-radius: 28px;
             text-align: center;
             border: 2px solid rgba(255, 0, 127, 0.5);
             box-shadow: 0 0 40px rgba(255, 0, 127, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.2);
             max-width: 90vw;
             width: 390px;
+            max-height: 90vh;
+            overflow-y: auto;
         }
 
         .modal-card h2 {
-            font-size: 2rem;
+            font-size: clamp(1.5rem, 5vw, 2rem);
             margin-bottom: 10px;
             background: linear-gradient(45deg, #ff007f, #00dfd8);
             -webkit-background-clip: text;
