@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2.5D Bardak Altı Altın Oyunu</title>
+    <!-- Tailwind CSS for UI controls -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: radial-gradient(circle at 50% 30%, #1a1e29 0%, #080a0f 100%);
+            color: #f3f4f6;
+            overflow-x: hidden;
+            user-select: none;
+        }
+
+        /* 3D Scene Viewport */
+        .perspective-container {
+            perspective: 1200px;
+            perspective-origin: 50% 20%;
+        }
+
+        /* Ambient Lighting Overlay */
+        .lighting-overlay {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 30%, rgba(255, 215, 0, 0.12) 0%, rgba(0, 0, 0, 0.8) 80%);
+            pointer-events: none;
+            z-index: 2;
+            border-radius: 40px;
+        }
+
+        /* Felt Table Styling with 3D Tilt */
+        .table-surface {
+            transform-style: preserve-3d;
+            transform: rotateX(28deg);
+            background: 
+                radial-gradient(circle at 50% 40%, rgba(255,255,255,0.08) 0%, transparent 60%),
+                radial-gradient(circle, #1e5e38 0%, #0f391f 70%, #071f11 100%);
+            box-shadow: 
+                0 30px 60px rgba(0,0,0,0.9), 
+                inset 0 0 120px rgba(0,0,0,0.8),
+                0 0 20px rgba(212, 175, 55, 0.2);
+            border: 14px solid #3d2314;
+            border-radius: 48px;
+            outline: 2px solid rgba(212, 175, 55, 0.4);
+        }
+
+        /* Cups 2.5D Design & Animation */
+        .cup-wrapper {
+            position: absolute;
+            width: 120px;
+            height: 160px;
+            transform-style: preserve-3d;
+            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), left 0.35s ease-in-out, top 0.35s ease-in-out;
+            cursor: pointer;
+            z-index: 20;
+        }
+
+        .cup {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.3s ease;
+        }
+
+        /* Realistic Cup Visuals with CSS Gradients */
+        .cup-body {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #ff4d4d 0%, #c0392b 40%, #7b1113 100%);
+            clip-path: polygon(15% 0%, 85% 0%, 100% 100%, 0% 100%);
+            border-radius: 14px 14px 4px 4px;
+            box-shadow: inset -12px 0 25px rgba(0,0,0,0.6), inset 12px 0 25px rgba(255,255,255,0.3);
+            z-index: 2;
+        }
+
+        .cup-body::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 20%;
+            width: 25%;
+            height: 100%;
+            background: linear-gradient(to right, rgba(255,255,255,0.45), rgba(255,255,255,0));
+            transform: skewX(-5deg);
+        }
+
+        .cup-lip {
+            position: absolute;
+            bottom: -8px;
+            left: -2%;
+            width: 104%;
+            height: 18px;
+            background: #640d14;
+            border-radius: 50%;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.7);
+            z-index: 3;
+        }
+
+        .cup-rim-top {
+            position: absolute;
+            top: -6px;
+            left: 15%;
+            width: 70%;
+            height: 12px;
+            background: #ff7676;
+            border-radius: 50%;
+            border: 2px solid #a93226;
+            z-index: 3;
+        }
+
+        .cup-shadow {
+            position: absolute;
+            bottom: -22px;
+            left: 5%;
+            width: 90%;
+            height: 32px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 50%;
+            filter: blur(8px);
+            transform: rotateX(80deg);
+            transition: all 0.3s ease;
+            z-index: 1;
+        }
+
+        /* Lifted State */
+        .cup-wrapper.lifted .cup {
+            transform: translateY(-115px) rotateX(-12deg);
+        }
+
+        .cup-wrapper.lifted .cup-shadow {
+            transform: scale(0.5) rotateX(80deg);
+            opacity: 0.25;
+            filter: blur(14px);
+        }
+
+        /* Shiny 2.5D Gold Coin Styling */
+        .coin-wrapper {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            transform-style: preserve-3d;
+            transition: left 0.35s ease-in-out, opacity 0.2s ease-in-out;
+            z-index: 5;
+            bottom: 35px;
+            opacity: 1;
+        }
+
+        .coin-wrapper.hidden-coin {
+            opacity: 0 !important;
+            pointer-events: none;
+        }
+
+        .coin {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, #ffffff 0%, #ffe066 30%, #f1c40f 60%, #b7950b 85%, #7d6608 100%);
+            box-shadow: 0 0 20px rgba(241, 196, 15, 0.8), inset 0 0 10px rgba(255, 255, 255, 0.9), 0 6px 0 #7d6608;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            color: #4a3b00;
+            font-size: 32px;
+            font-family: 'Poppins', sans-serif;
+            text-shadow: 1px 1px 0 rgba(255,255,255,0.8), -1px -1px 0 rgba(0,0,0,0.4);
+            animation: coinGlow 1.8s infinite alternate;
+        }
+
+        @keyframes coinGlow {
+            0% { box-shadow: 0 0 12px rgba(241, 196, 15, 0.6), inset 0 0 8px rgba(255, 255, 255, 0.8), 0 6px 0 #7d6608; transform: translateY(0); }
+            100% { box-shadow: 0 0 30px rgba(241, 196, 15, 1), inset 0 0 14px rgba(255, 255, 255, 1), 0 6px 0 #7d6608; transform: translateY(-3px); }
+        }
+
+        .coin-shadow {
+            position: absolute;
+            bottom: -10px;
+            left: 10%;
+            width: 80%;
+            height: 15px;
+            background: rgba(0,0,0,0.6);
+            border-radius: 50%;
+            filter: blur(5px);
+        }
+
+        /* Luxury Metallic Gold Button Styling */
+        .btn-gold-luxury {
+            background: linear-gradient(135deg, #fceabb 0%, #f8b500 35%, #e65c00 70%, #fceabb 100%);
+            background-size: 200% auto;
+            color: #1a0f00;
+            font-weight: 800;
+            letter-spacing: 1px;
+            border: 2px solid #fff3b0;
+            box-shadow: 0 6px 20px rgba(248, 181, 0, 0.4), inset 0 2px 4px rgba(255, 255, 255, 0.8), inset 0 -2px 4px rgba(0, 0, 0, 0.4);
+            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        .btn-gold-luxury:hover:not(:disabled) {
+            background-position: right center;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 28px rgba(248, 181, 0, 0.6), inset 0 2px 6px rgba(255, 255, 255, 0.9), inset 0 -2px 6px rgba(0, 0, 0, 0.5);
+        }
+
+        .btn-gold-luxury:active:not(:disabled) {
+            transform: translateY(1px);
+            box-shadow: 0 3px 10px rgba(248, 181, 0, 0.3);
+        }
+
+        .btn-gold-secondary {
+            background: linear-gradient(135deg, #2c2a26 0%, #1a1815 100%);
+            color: #f3ce72;
+            font-weight: 700;
+            border: 2px solid #8f6e2f;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6), inset 0 1px 2px rgba(255, 243, 176, 0.2);
+            transition: all 0.2s ease;
+        }
+
+        .btn-gold-secondary:hover:not(:disabled) {
+            background: linear-gradient(135deg, #3a3731 0%, #25221d 100%);
+            border-color: #d4af37;
+            color: #fff3b0;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(212, 175, 55, 0.3);
+        }
+
+        .btn-gold-secondary:active:not(:disabled) {
+            transform: translateY(1px);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between items-center p-4">
+
+    <!-- Top Navigation Header -->
+    <header class="w-full max-w-4xl flex justify-between items-center bg-gray-900/90 backdrop-blur border border-amber-500/30 p-4 rounded-2xl shadow-2xl mt-2">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-extrabold text-xl shadow-inner">
+                🏆
+            </div>
+            <div>
+                <h1 class="text-xl font-bold bg-gradient-to-r from-amber-200 via-amber-400 to-amber-100 bg-clip-text text-transparent">
+                    2.5D Bardak Altı Altın
+                </h1>
+                <p class="text-xs text-gray-400">Altın Parayı Takip Et & Kazan!</p>
+            </div>
+        </div>
+
+        <!-- Dynamic Game Stats -->
+        <div class="flex items-center space-x-4 md:space-x-6">
+            <div class="text-right">
+                <span class="text-xs text-gray-400 block uppercase tracking-wider">Seviye</span>
+                <span id="levelDisplay" class="text-lg md:text-xl font-extrabold text-blue-400">1</span>
+            </div>
+            <div class="text-right border-l border-gray-800 pl-4 md:pl-6">
+                <span class="text-xs text-gray-400 block uppercase tracking-wider">Bakiye</span>
+                <span id="balanceDisplay" class="text-lg md:text-xl font-extrabold text-amber-400">1,000 $</span>
+            </div>
+            <div class="text-right border-l border-gray-800 pl-4 md:pl-6">
+                <span class="text-xs text-gray-400 block uppercase tracking-wider">Seri</span>
+                <span id="streakDisplay" class="text-lg md:text-xl font-extrabold text-emerald-400">0 🔥</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Game Play Area -->
+    <main class="w-full max-w-4xl my-auto flex flex-col items-center">
+        
+        <!-- Game Status / Notification Banner -->
+        <div id="statusBanner" class="mb-6 px-6 py-2.5 rounded-full bg-gray-900/90 border border-amber-500/30 text-center text-sm md:text-base font-semibold shadow-xl text-amber-300">
+            Oyuna başlamak için "KARIŞTIR & BAŞLA" butonuna basın!
+        </div>
+
+        <!-- 3D Table Area -->
+        <div class="perspective-container w-full max-w-2xl h-[360px] flex items-center justify-center relative">
+
+            <!-- Table Surface -->
+            <div class="table-surface w-full h-full relative flex items-center justify-center overflow-hidden">
+                <div class="lighting-overlay"></div>
+
+                <!-- Table Inner Border / Inlay -->
+                <div class="absolute inset-5 border-2 border-amber-500/20 rounded-3xl pointer-events-none"></div>
+
+                <!-- 2.5D Metallic Gold Coin with Dollar Sign -->
+                <div id="goldCoin" class="coin-wrapper" style="left: calc(50% - 30px);">
+                    <div class="coin">$</div>
+                    <div class="coin-shadow"></div>
+                </div>
+
+                <!-- 3 Interactive Cups -->
+                <div id="cup0" class="cup-wrapper" onclick="selectCup(0)">
+                    <div class="cup">
+                        <div class="cup-rim-top"></div>
+                        <div class="cup-body"></div>
+                        <div class="cup-lip"></div>
+                    </div>
+                    <div class="cup-shadow"></div>
+                </div>
+
+                <div id="cup1" class="cup-wrapper" onclick="selectCup(1)">
+                    <div class="cup">
+                        <div class="cup-rim-top"></div>
+                        <div class="cup-body"></div>
+                        <div class="cup-lip"></div>
+                    </div>
+                    <div class="cup-shadow"></div>
+                </div>
+
+                <div id="cup2" class="cup-wrapper" onclick="selectCup(2)">
+                    <div class="cup">
+                        <div class="cup-rim-top"></div>
+                        <div class="cup-body"></div>
+                        <div class="cup-lip"></div>
+                    </div>
+                    <div class="cup-shadow"></div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Control Bar -->
+        <div class="w-full max-w-md bg-gradient-to-b from-gray-900 to-black border border-amber-500/30 rounded-2xl p-4 mt-6 shadow-2xl flex flex-col space-y-4">
+            
+            <!-- Settings Controls -->
+            <div class="flex justify-between items-center text-xs text-gray-300 px-2">
+                <div class="flex items-center space-x-2">
+                    <span class="text-amber-200 font-semibold">Hız Modu:</span>
+                    <select id="speedSelect" class="bg-gray-800 border border-amber-500/40 rounded-lg px-2 py-1 text-amber-300 focus:outline-none">
+                        <option value="slow">Yavaş</option>
+                        <option value="normal" selected>Normal</option>
+                        <option value="fast">Hızlı</option>
+                        <option value="insane">Çılgın</option>
+                    </select>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-amber-200 font-semibold">Bahis:</span>
+                    <select id="betSelect" class="bg-gray-800 border border-amber-500/40 rounded-lg px-2 py-1 text-amber-300 focus:outline-none">
+                        <option value="50">50 $</option>
+                        <option value="100" selected>100 $</option>
+                        <option value="250">250 $</option>
+                        <option value="500">500 $</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Action Buttons with Luxury Gold Styling -->
+            <div class="flex space-x-3">
+                <button id="startBtn" onclick="startGame()" class="btn-gold-luxury flex-1 py-3 px-6 rounded-xl uppercase text-sm flex items-center justify-center space-x-2">
+                    <span>🎲 KARIŞTIR VE BAŞLA</span>
+                </button>
+                <button id="resetBtn" onclick="resetGame()" class="btn-gold-secondary px-5 py-3 rounded-xl text-sm uppercase">
+                    Sıfırla
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center text-xs text-gray-500 py-3">
+        Powered By SGame Studios - ©SGame Studios - 2026
+    </footer>
+
+    <!-- Game Script & Sound Logic -->
+    <script>
+        // Game State Variables
+        let balance = 1000;
+        let streak = 0;
+        let level = 1;
+        let coinPosition = 1; // Slot index (0, 1, or 2)
+        let cupPositions = [0, 1, 2]; // Map slot index to cup ID
+        let isShuffling = false;
+        let isWaitingForGuess = false;
+        let audioCtx = null;
+
+        // Visual Coordinates for Slots
+        const slotX = [18, 50, 82];
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // Enhanced Polyphonic Synthetic Sound Engine
+        function playSound(type) {
+            if (!audioCtx) return;
+            try {
+                const now = audioCtx.currentTime;
+
+                if (type === 'lift') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(260, now);
+                    osc.frequency.exponentialRampToValueAtTime(750, now + 0.22);
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.22);
+                } else if (type === 'swap') {
+                    const osc = audioCtx.createOscillator();
+                    const filter = audioCtx.createBiquadFilter();
+                    const gain = audioCtx.createGain();
+                    
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(140 + Math.random() * 40, now);
+                    osc.frequency.exponentialRampToValueAtTime(320, now + 0.14);
+
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(800, now);
+
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+
+                    osc.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.14);
+                } else if (type === 'win') {
+                    const notes = [523.25, 659.25, 783.99, 1046.50];
+                    notes.forEach((freq, idx) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+                        gain.gain.setValueAtTime(0.2, now + idx * 0.08);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.35);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now + idx * 0.08);
+                        osc.stop(now + idx * 0.08 + 0.35);
+                    });
+                } else if (type === 'lose') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.linearRampToValueAtTime(90, now + 0.4);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.4);
+                }
+            } catch (e) {
+                console.log("Audio error", e);
+            }
+        }
+
+        // Update Position of Cups & Gold Coin
+        function updateCupVisuals(animated = true) {
+            for (let slot = 0; slot < 3; slot++) {
+                const cupId = cupPositions[slot];
+                const cupEl = document.getElementById(`cup${cupId}`);
+                
+                if (!animated) {
+                    cupEl.style.transition = 'none';
+                } else {
+                    cupEl.style.transition = 'left 0.28s ease-in-out, top 0.28s ease-in-out, transform 0.3s ease';
+                }
+
+                cupEl.style.left = `calc(${slotX[slot]}% - 60px)`;
+                cupEl.style.top = `calc(50% - 70px)`;
+            }
+
+            // Keep gold coin aligned with its current slot
+            const coinEl = document.getElementById('goldCoin');
+            if (!animated) {
+                coinEl.style.transition = 'none';
+            } else {
+                coinEl.style.transition = 'left 0.28s ease-in-out, opacity 0.2s ease-in-out';
+            }
+            coinEl.style.left = `calc(${slotX[coinPosition]}% - 30px)`;
+        }
+
+        function liftCup(cupId, lifted) {
+            const cupEl = document.getElementById(`cup${cupId}`);
+            if (lifted) {
+                cupEl.classList.add('lifted');
+                playSound('lift');
+            } else {
+                cupEl.classList.remove('lifted');
+            }
+        }
+
+        // Helper Functions to Show/Hide Coin
+        function hideCoin() {
+            const coinEl = document.getElementById('goldCoin');
+            coinEl.classList.add('hidden-coin');
+        }
+
+        function showCoin() {
+            const coinEl = document.getElementById('goldCoin');
+            coinEl.classList.remove('hidden-coin');
+        }
+
+        // Main Game Loop
+        async function startGame() {
+            initAudio();
+            if (isShuffling || isWaitingForGuess) return;
+
+            const bet = parseInt(document.getElementById('betSelect').value);
+            if (balance < bet) {
+                updateBanner("⚠️ Yetersiz bakiye! Lütfen oyunu sıfırlayın.", "text-red-400 border-red-500/40");
+                return;
+            }
+
+            // Deduct Bet
+            balance -= bet;
+            updateUI();
+
+            isShuffling = true;
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('startBtn').classList.add('opacity-50', 'cursor-not-allowed');
+
+            // Paranın hangi slotta duracağını belirle
+            coinPosition = Math.floor(Math.random() * 3);
+            
+            // Step 1: Parayı masanın üstünde açıkça göster
+            showCoin();
+            updateCupVisuals(false);
+
+            updateBanner("👀 Paraya dikkat edin! Bardağın içine giriyor...", "text-amber-300 border-amber-500/40");
+
+            // Step 2: Paranın üzerindeki bardağı kaldır ve içine al
+            const targetCupId = cupPositions[coinPosition];
+            await sleep(200);
+            liftCup(targetCupId, true); // Bardak paranın üstüne kalkar
+            await sleep(1000);
+
+            // Bardağı indirip parayı içine hapset
+            liftCup(targetCupId, false);
+            await sleep(350);
+            hideCoin(); // Para tamamen bardağın içinde gizlenir
+
+            // Step 3: Dynamic Shuffling
+            updateBanner("🔀 Bardaklar karıştırılıyor...", "text-emerald-400 border-emerald-500/40");
+
+            const speedSetting = document.getElementById('speedSelect').value;
+            let baseSwaps = 7 + Math.min(level, 5);
+            let swapDelay = 320;
+
+            if (speedSetting === 'slow') {
+                swapDelay = 450;
+            } else if (speedSetting === 'fast') {
+                swapDelay = 220;
+                baseSwaps += 3;
+            } else if (speedSetting === 'insane') {
+                swapDelay = 150;
+                baseSwaps += 6;
+            }
+
+            for (let i = 0; i < baseSwaps; i++) {
+                let slotA = Math.floor(Math.random() * 3);
+                let slotB = Math.floor(Math.random() * 3);
+                while (slotA === slotB) {
+                    slotB = Math.floor(Math.random() * 3);
+                }
+
+                // Swap in cup array
+                const temp = cupPositions[slotA];
+                cupPositions[slotA] = cupPositions[slotB];
+                cupPositions[slotB] = temp;
+
+                // Track coin position
+                if (coinPosition === slotA) {
+                    coinPosition = slotB;
+                } else if (coinPosition === slotB) {
+                    coinPosition = slotA;
+                }
+
+                playSound('swap');
+                updateCupVisuals(true);
+                await sleep(swapDelay);
+            }
+
+            // Step 4: Await Player Guess
+            isShuffling = false;
+            isWaitingForGuess = true;
+            updateBanner("❓ Nerede? Doğru bardağa tıklayın!", "text-yellow-300 border-yellow-500/40 animate-pulse");
+        }
+
+        // Selection Phase
+        async function selectCup(cupId) {
+            if (!isWaitingForGuess || isShuffling) return;
+
+            isWaitingForGuess = false;
+
+            const selectedSlot = cupPositions.indexOf(cupId);
+            const bet = parseInt(document.getElementById('betSelect').value);
+
+            // Bardağı kaldır
+            liftCup(cupId, true);
+
+            if (selectedSlot === coinPosition) {
+                // WIN! Parayı bardağın altında açığa çıkar
+                showCoin();
+                const winAmount = bet * 2;
+                balance += winAmount;
+                streak++;
+                level++;
+                playSound('win');
+                updateBanner(`🎉 TEBRİKLER! +${winAmount} $ Kazandınız! (Seviye ${level})`, "text-emerald-400 border-emerald-500/50 font-bold");
+            } else {
+                // LOSE!
+                streak = 0;
+                playSound('lose');
+                updateBanner(`❌ YANLIŞ SEÇİM! Altın buradaydı...`, "text-red-400 border-red-500/50 font-bold");
+
+                // Doğru bardağı da kaldır ve parayı açığa çıkar
+                await sleep(300);
+                showCoin();
+                const correctCupId = cupPositions[coinPosition];
+                liftCup(correctCupId, true);
+            }
+
+            updateUI();
+
+            await sleep(2500);
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('startBtn').classList.remove('opacity-50', 'cursor-not-allowed');
+
+            // Reset cup lifts and show coin on table again for next round
+            liftCup(0, false);
+            liftCup(1, false);
+            liftCup(2, false);
+            await sleep(400);
+            showCoin();
+        }
+
+        function updateBanner(msg, colorClass) {
+            const banner = document.getElementById('statusBanner');
+            banner.className = `mb-6 px-6 py-2.5 rounded-full bg-gray-900/90 border text-center text-sm md:text-base font-semibold shadow-xl ${colorClass}`;
+            banner.innerText = msg;
+        }
+
+        function updateUI() {
+            document.getElementById('balanceDisplay').innerText = `${balance.toLocaleString()} $`;
+            document.getElementById('streakDisplay').innerText = `${streak} 🔥`;
+            document.getElementById('levelDisplay').innerText = `${level}`;
+        }
+
+        function resetGame() {
+            balance = 1000;
+            streak = 0;
+            level = 1;
+            cupPositions = [0, 1, 2];
+            coinPosition = 1;
+            isShuffling = false;
+            isWaitingForGuess = false;
+
+            liftCup(0, false);
+            liftCup(1, false);
+            liftCup(2, false);
+
+            updateCupVisuals(false);
+            updateUI();
+            updateBanner("Oyuna başlamak için \"KARIŞTIR & BAŞLA\" butonuna basın!", "text-amber-300 border-amber-500/30");
+
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('startBtn').classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        window.onload = function() {
+            updateCupVisuals(false);
+            updateUI();
+        };
+
+        window.onresize = function() {
+            updateCupVisuals(false);
+        };
+    </script>
+</body>
+</html>
