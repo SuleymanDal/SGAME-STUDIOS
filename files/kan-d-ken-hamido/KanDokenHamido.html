@@ -5263,6 +5263,34 @@ const Player = {
         });
         document.addEventListener('keyup', (e) => this.keys[e.code] = false);
 
+        // 📱 Mobil sanal tuşları gerçek tuşlarla birleştir
+        this._origKeys = this.keys;
+        const self = this;
+        Object.defineProperty(this, 'keys', {
+            get() {
+                if (typeof MobileSupport !== 'undefined' && MobileSupport.isMobile()) {
+                    const vk = MobileSupport.getVirtualKeys();
+                    // Sanal + gerçek tuşları birleştiren hafif wrapper
+                    // Proxy yerine direkt nesne döndür (her erişimde aynı referans)
+                    if (!self._mergedKeys) {
+                        self._mergedKeys = new Proxy(self._origKeys, {
+                            get(target, prop) {
+                                return target[prop] || vk[prop] || false;
+                            },
+                            set(target, prop, value) {
+                                target[prop] = value;
+                                return true;
+                            }
+                        });
+                    }
+                    return self._mergedKeys;
+                }
+                return self._origKeys;
+            },
+            set(val) { self._origKeys = val; self._mergedKeys = null; },
+            configurable: true
+        });
+
         // Body olustur
         try { this._forceBody(); } catch (e) { console.warn('_forceBody:', e); }
     },
@@ -6552,6 +6580,34 @@ const Weapons = {
             if (e.code === 'Digit5') this.equip(4);
         });
 
+        // 📱 Mobil sanal tuş dinleyicisi
+        this._mobileFireActive = false;
+        this._mobileAdsActive  = false;
+        setInterval(() => {
+            if (typeof MobileSupport === 'undefined' || !MobileSupport.isMobile()) return;
+            const vk = MobileSupport.getVirtualKeys();
+
+            // Ateş
+            if (vk['Fire'] && !this._mobileFireActive) {
+                this._mobileFireActive = true;
+                this.startShooting();
+            } else if (!vk['Fire'] && this._mobileFireActive) {
+                this._mobileFireActive = false;
+                this.stopShooting();
+            }
+
+            // ADS
+            if (vk['ADS'] && !this._mobileAdsActive) {
+                this._mobileAdsActive = true;
+                this.adsActive = true;
+                if (Game.camera) { Game.camera.fov = this.adsFov; Game.camera.updateProjectionMatrix(); }
+            } else if (!vk['ADS'] && this._mobileAdsActive) {
+                this._mobileAdsActive = false;
+                this.adsActive = false;
+                if (Game.camera) { Game.camera.fov = this.originalFov; Game.camera.updateProjectionMatrix(); }
+            }
+        }, 16);
+
         this.fireLoop();
     },
 
@@ -7563,6 +7619,8 @@ const Game = {
 
     setupControls() {
         document.addEventListener('click', (e) => {
+            // Mobilde pointer lock isteme — dokunmatik kontroller zaten aktif
+            if (typeof MobileSupport !== 'undefined' && MobileSupport.isMobile()) return;
             if (this.running && !this.paused && !this.pointerLocked &&
                 e.target.tagName !== 'BUTTON' &&
                 !Inventory.isOpen && !Crafting.open) {
@@ -7582,6 +7640,20 @@ const Game = {
             Player.pitch -= e.movementY * sens;
             Player.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, Player.pitch));
         });
+
+        // 📱 Mobil kamera döndürme (sağ dokunma alanından delta oku)
+        this._mobileCamInterval = setInterval(() => {
+            if (!this.running || this.paused) return;
+            if (typeof MobileSupport === 'undefined' || !MobileSupport.isMobile()) return;
+            if (Inventory.isOpen || Crafting.open) return;
+            const { dx, dy } = MobileSupport.consumeCamDelta();
+            if (dx === 0 && dy === 0) return;
+            let sens = 1.0;
+            if (Weapons.adsActive) sens *= 0.45;
+            Player.yaw   -= dx * sens;
+            Player.pitch -= dy * sens;
+            Player.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, Player.pitch));
+        }, 16);
 
         document.addEventListener('keydown', (e) => {
             if (e.code === 'Escape' && this.running && !this.paused) this.pause();
@@ -7639,17 +7711,25 @@ const Game = {
             Stage.startStage();
             this.animate();
 
-            // Pointer lock — agresif dene
-            const canvas = this.renderer.domElement;
-            canvas.focus && canvas.focus();
-            setTimeout(() => {
-                try {
-                    const p = document.body.requestPointerLock();
-                    if (p && p.catch) p.catch(e => console.warn('PL red:', e.message));
-                } catch (e) { console.warn('PL hata:', e); }
-            }, 100);
+            // 📱 Mobil kontrolleri göster
+            if (typeof MobileSupport !== 'undefined' && MobileSupport.isMobile()) {
+                const mc = document.getElementById('mobile-controls');
+                if (mc) mc.style.display = 'block';
+            }
 
-            try { document.body.requestPointerLock(); } catch (err) {}
+            // Pointer lock — agresif dene (masaüstünde)
+            if (typeof MobileSupport === 'undefined' || !MobileSupport.isMobile()) {
+                const canvas = this.renderer.domElement;
+                canvas.focus && canvas.focus();
+                setTimeout(() => {
+                    try {
+                        const p = document.body.requestPointerLock();
+                        if (p && p.catch) p.catch(e => console.warn('PL red:', e.message));
+                    } catch (e) { console.warn('PL hata:', e); }
+                }, 100);
+
+                try { document.body.requestPointerLock(); } catch (err) {}
+            }
 
             if (Audio.ctx && Audio.ctx.state === 'suspended') Audio.ctx.resume();
             Audio.startAmbient();
@@ -7667,6 +7747,11 @@ const Game = {
         this.paused = true;
         document.getElementById('pause').style.display = 'flex';
         document.exitPointerLock();
+        // 📱 Mobil kontrolleri gizle
+        if (typeof MobileSupport !== 'undefined' && MobileSupport.isMobile()) {
+            const mc = document.getElementById('mobile-controls');
+            if (mc) mc.style.display = 'none';
+        }
     },
 
     resume() {
@@ -7674,6 +7759,11 @@ const Game = {
         this.paused = false;
         document.getElementById('pause').style.display = 'none';
         try { document.body.requestPointerLock(); } catch (err) {}
+        // 📱 Mobil kontrolleri göster
+        if (typeof MobileSupport !== 'undefined' && MobileSupport.isMobile()) {
+            const mc = document.getElementById('mobile-controls');
+            if (mc) mc.style.display = 'block';
+        }
     },
 
     gameOver() {
@@ -7684,6 +7774,11 @@ const Game = {
         document.getElementById('gameover').style.display = 'flex';
         document.exitPointerLock();
         Audio.stopAmbient();
+        // 📱 Mobil kontrolleri gizle
+        if (typeof MobileSupport !== 'undefined' && MobileSupport.isMobile()) {
+            const mc = document.getElementById('mobile-controls');
+            if (mc) mc.style.display = 'none';
+        }
     },
 
     animate() {
